@@ -10,20 +10,39 @@ import session_calculator as sc
 class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/register":
-            data  = json.loads(self.rfile.read(int(self.headers.get("Content-Length", -1))))
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length == 0:
+                    raise ValueError("Empty body")
+                body = self.rfile.read(content_length)
+                data = json.loads(body)
+            except Exception:
+                self.send_response(400)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(b"Invalid or empty request body")
+                return
             username = data.get("username")
             password = data.get("password")
             name = data.get("name")
-            hashed_password = hashlib.md5(password.encode()).hexdigest()
+            if not password or not username or not name:
+                self.send_response(400)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(b"Missing fields")
+                return
+
             users = load_json('data/users.json')
             for user in users:
                 if username == user['username']:
-                    self.send_response(200)
+                    self.send_response(409)
                     self.send_header("Content-type", "application/json")
                     self.end_headers()
                     self.wfile.write(b"Username already taken")
                     return
-            users.add({
+
+            hashed_password = hashlib.md5(password.encode()).hexdigest()
+            users.append({
                 'username': username,
                 'password': hashed_password,
                 'name': name
@@ -36,7 +55,22 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
         elif self.path == "/login":
-            data  = json.loads(self.rfile.read(int(self.headers.get("Content-Length", -1))))
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length == 0:
+                    self.send_response(400)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b"Empty request body")
+                    return
+                body = self.rfile.read(content_length)
+                data = json.loads(body)
+            except Exception:
+                self.send_response(400)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(b"Invalid or empty request body")
+                return
             username = data.get("username")
             password = data.get("password")
             if not username or not password:
@@ -54,18 +88,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({"message": "User logged in", "session_token": token}).encode('utf-8'))
-                    return
-                else:
-                    self.send_response(401)
-                    self.send_header("Content-type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(b"Invalid credentials")
+                    self.wfile.write(json.dumps({
+                        "message": "User logged in",
+                        "session_token": token
+                    }).encode('utf-8'))
                     return
             self.send_response(401)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(b"User not found")
+            self.wfile.write(b"Invalid credentials")
 
 
         elif self.path.startswith("/parking-lots"):
