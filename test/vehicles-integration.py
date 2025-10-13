@@ -1,6 +1,7 @@
 import requests
 import pytest
 
+
 url = "http://localhost:8000/"
 
 
@@ -144,7 +145,7 @@ def test_delete_nonexisting():
     lid = "66ABC6"
     res = requests.delete(f"{url}/vehicles/{lid}", headers=headers)
     assert res.status_code == 403
-    assert "vehicle not found" in res.text
+    assert "Vehicle not found" in res.text
 
 
 # test passed if an existing vehicle is deleted successfully and returns 200
