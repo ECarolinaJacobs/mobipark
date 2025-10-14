@@ -4,6 +4,7 @@ from hashlib import md5
 import math
 import uuid
 
+
 def calculate_price(parkinglot, sid, data):
     price = 0
     start = datetime.strptime(data["started"], "%d-%m-%Y %H:%M:%S")
@@ -29,13 +30,13 @@ def calculate_price(parkinglot, sid, data):
     return (price, hours, diff.days + 1 if end.date() > start.date() else 0)
 
 
-
 def generate_payment_hash(sid, data):
     return md5(str(sid + data["licenseplate"]).encode("utf-8")).hexdigest()
 
 
 def generate_transaction_validation_hash():
     return str(uuid.uuid4())
+
 
 def check_payment_amount(hash):
     payments = load_payment_data()

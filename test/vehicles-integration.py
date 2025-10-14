@@ -8,9 +8,12 @@ url = "http://localhost:8000/"
 # register and login helper method, returns authentication headers for testing purposes
 def register_login(username="vehicle_user", password="123"):
     requests.post(
-        f"{url}/register", json={"username": username, "password": password, "name": "tester vehicle"}
+        f"{url}/register",
+        json={"username": username, "password": password, "name": "tester vehicle"},
     )
-    res = requests.post(f"{url}/login", json={"username": username, "password": password})
+    res = requests.post(
+        f"{url}/login", json={"username": username, "password": password}
+    )
     assert res.status_code == 200
     ses_token = res.json()["session_token"]
     return {"Authorization": ses_token}
