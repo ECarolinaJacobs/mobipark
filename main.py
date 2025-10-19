@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from endpoints.auth import router as auth_router
+from endpoints.vehicles import router as vehicles_router
 
 app = FastAPI()
 
@@ -7,6 +8,8 @@ app = FastAPI()
 # folder. Prefix is the grouping of the endpoint
 # this is only necessary for auth to group them
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(vehicles_router)
+
 
 @app.get("/")
 def read_root():
