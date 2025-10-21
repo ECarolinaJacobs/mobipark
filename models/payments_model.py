@@ -1,22 +1,42 @@
-from pydantic import BaseModel
-from datetime import datetime
+from pydantic import BaseModel, Field
 from typing import Optional
 
-    
-class PaymentUpdate(BaseModel):
+
+class TData(BaseModel):
+    """Nested transaction data"""
     amount: float
-    t_data_method: Optional[str] = None
-    t_data_issuer: Optional[str] = None
-    t_data_bank: Optional[str] = None
-    
+    date: str  # Format: "2025-07-14 22:30:17"
+    method: str
+    issuer: str
+    bank: str
+
+
+class Payment(BaseModel):
+    """Complete payment model matching your JSON structure"""
+    transaction: str
+    amount: float
+    initiator: str
+    created_at: str  # Format: "14-07-2025 22:30:171752525017"
+    completed: str  # Format: "14-07-2025 22:30:171752525024"
+    hash: str
+    t_data: TData
+    session_id: str  # Stored as string in JSON
+    parking_lot_id: str  # Stored as string in JSON
+
+
 class PaymentCreate(BaseModel):
+    """Model for creating a payment - only fields the user provides"""
     amount: float
-    session_id: int
-    parking_lot_id: int
-    # Optional fields
+    session_id: int  # User sends as int, we convert to string
+    parking_lot_id: int  # User sends as int, we convert to string
+    t_data: TData
     completed: Optional[str] = None
-    t_data_method: Optional[str] = None
-    t_data_issuer: Optional[str] = None
-    t_data_bank: Optional[str] = None
-    t_data_date: Optional[str] = None
-    
+
+
+class PaymentUpdate(BaseModel):
+    transaction: Optional[float] = None
+    amount: Optional[float] = None
+    completed: Optional[str] = None
+    t_data: Optional[TData] = None
+    session_id: Optional[int] = None
+    parking_lot_id: Optional[int] = None

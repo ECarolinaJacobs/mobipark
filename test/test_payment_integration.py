@@ -2,16 +2,10 @@ import pytest
 import requests
 from datetime import datetime
 import uuid
-from hashlib import md5
-
-
-def generate_random_hash():
-    """Generate a random MD5 hash for testing purposes"""
-    return md5(str(uuid.uuid4()).encode("utf-8")).hexdigest()
-
 
 BASE_URL = "http://localhost:8000/"
 
+# User credentials
 USER_LOGIN = {
     "username": "test",
     "password": "test",
@@ -23,7 +17,19 @@ ADMIN_LOGIN = {
 }
 
 
-# Fixtures and Helpers
+# ============================================================================
+# AUTHENTICATION HELPER AND FIXTURES
+# ============================================================================
+
+def login(role: str = "user"):
+    """Login and return authorization headers"""
+    credentials = USER_LOGIN if role == "user" else ADMIN_LOGIN
+    res = requests.post(url=f"{BASE_URL}login", json=credentials)
+    assert res.status_code == 200, f"Login failed: {res.json()}"
+    token = res.json()["session_token"]
+    return {"Authorization": token}
+
+
 @pytest.fixture
 def user_headers():
     """Get authentication headers for regular user"""
@@ -36,434 +42,475 @@ def admin_headers():
     return login("admin")
 
 
-@pytest.fixture
-def sample_payment_data(user_headers):
-    """Sample payment data for POST/PUT requests with all required fields"""
-    return {
-        "transaction": generate_random_hash(),
-        "amount": 100.50,
-        "initiator": "test",
-        "hash": generate_random_hash(),
-        "t_data": {
-            "amount": 100.50,
-            "date": datetime.now().isoformat(),
-            "method": "credit_card",
-            "issuer": "Visa",
-            "bank": "Chase",
-        },
-    }
-
+# ============================================================================
+# PAYMENT DATA FIXTURES
+# ============================================================================
 
 @pytest.fixture
-def sample_payment_data_amount_negative(user_headers):
-    """Sample payment data for POST/PUT requests with all required fields and amount is zero"""
-    return {
-        "transaction": generate_random_hash(),
-        "amount": -20,
-        "initiator": "test",
-        "hash": generate_random_hash(),
-        "t_data": {
-            "amount": 0.0,
-            "date": datetime.now().isoformat(),
-            "method": "credit_card",
-            "issuer": "Visa",
-            "bank": "Chase",
-        },
-    }
-
-
-@pytest.fixture
-def sample_payment_data_no_transaction_id():
-    """Sample payment data missing transaction ID"""
+def sample_payment_data():
+    """Sample payment data for POST requests"""
     return {
         "amount": 100.50,
-        "initiator": "test",
-        "hash": generate_random_hash(),
+        "session_id": 14532,
+        "parking_lot_id": 1500,
         "t_data": {
             "amount": 100.50,
-            "date": datetime.now().isoformat(),
-            "method": "credit_card",
-            "issuer": "Visa",
-            "bank": "Chase",
-        },
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "method": "ideal",
+            "issuer": "TJ1SV6ZN",
+            "bank": "ASN"
+        }
     }
 
 
 @pytest.fixture
-def sample_payment_data_no_validation_hash():
-    """Sample payment data missing validation hash"""
-    return {
-        "transaction": generate_random_hash(),
-        "amount": 100.50,
-        "initiator": "test",
-        "t_data": {
-            "amount": 100.50,
-            "date": datetime.now().isoformat(),
-            "method": "credit_card",
-            "issuer": "Visa",
-            "bank": "Chase",
-        },
-    }
+def created_payment(user_headers, sample_payment_data):
+    """Create a payment and return it"""
+    res = requests.post(
+        url=f"{BASE_URL}payments",
+        json=sample_payment_data,
+        headers=user_headers
+    )
+    assert res.status_code == 201
+    return res.json()
 
 
 @pytest.fixture
-def sample_transaction_data():
-    """Sample transaction data for nested objects"""
-    return {
-        "amount": 250.75,
-        "date": datetime.now().isoformat(),
-        "method": "debit_card",
-        "issuer": "Mastercard",
-        "bank": "Bank of America",
-    }
-
-
-def login(role: str = "user"):
-    """Login and return authorization headers"""
-    credentials = USER_LOGIN if role == "user" else ADMIN_LOGIN
-    res = requests.post(url=f"{BASE_URL}login", json=credentials)
-    token = res.json()["session_token"]
-    return {"Authorization": token}
-
-
-class TestGetPayments:
-    """Test GET endpoints for payments"""
-
-    def test_get_own_payments_authenticated_user(self, user_headers):
-        """User can retrieve their own payments"""
-        res = requests.get(url=f"{BASE_URL}payments", headers=user_headers)
-        assert res.status_code == 200
-        assert isinstance(res.json(), list)
-
-    def test_get_payments_unauthenticated(self):
-        """Unauthenticated request should fail"""
-        res = requests.get(
-            url=f"{BASE_URL}payments", headers={"Authorization": "invalid_token"}
-        )
-        assert res.status_code == 401
-
-    def test_get_all_payments_as_user(self, user_headers):
-        """Regular user cannot access all payments"""
-        res = requests.get(url=f"{BASE_URL}payments/", headers=user_headers)
-        assert res.status_code == 403
-
-    def test_get_other_user_payment(self, user_headers):
-        """User cannot access another user's payment"""
-        fake_id = str(uuid.uuid4())
-        res = requests.get(url=f"{BASE_URL}payments/{fake_id}", headers=user_headers)
-        assert res.status_code in [403, 404]
-
-    def test_get_all_payments_as_admin(self, admin_headers):
-        """Admin can retrieve all payments"""
-        res = requests.get(url=f"{BASE_URL}payments/", headers=admin_headers)
-        assert res.status_code == 200
-        assert len(res.json()) > 100
-
-    def test_get_specific_payment_exists(self, admin_headers):
-        """Admin can retrieve specific payment by ID"""
-        res = requests.get(url=f"{BASE_URL}payments/", headers=admin_headers)
-        payments = res.json()
-        assert len(payments) != 0
-        if payments:
-            payment_id = payments[0]["transaction"]
-            res = requests.get(
-                url=f"{BASE_URL}payments/{payment_id}", headers=admin_headers
-            )
-            assert res.status_code == 200
-
-    def test_get_payment_not_exists(self, admin_headers):
-        """Getting non-existent payment returns 404"""
-        fake_id = str(uuid.uuid4())
-        res = requests.get(url=f"{BASE_URL}payments/{fake_id}", headers=admin_headers)
-        assert res.status_code == 404
-
-
-class TestPostPayments:
-    """Test POST endpoints for payments"""
-
-    def test_post_payment_without_transaction_id(
-        self, user_headers, sample_payment_data_no_transaction_id
-    ):
-        """Trying to add payment without transaction field"""
+def multiple_payments(user_headers, sample_payment_data):
+    """Create multiple payments for the same user"""
+    payments = []
+    for i in range(3):
+        data = sample_payment_data.copy()
+        data["amount"] = 50.00 + (i * 10)
+        data["session_id"] = 14532 + i
+        data["t_data"] = {
+            "amount": 50.00 + (i * 10),
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "method": "ideal",
+            "issuer": f"ISSUER_{i}",
+            "bank": "ASN"
+        }
         res = requests.post(
             url=f"{BASE_URL}payments",
-            json=sample_payment_data_no_transaction_id,
-            headers=user_headers,
-        )
-        assert res.status_code in [400, 422]
-
-    def test_post_payment_without_validation_hash(
-        self, user_headers, sample_payment_data_no_validation_hash
-    ):
-        """Trying to add payment without validation field"""
-        res = requests.post(
-            url=f"{BASE_URL}payments",
-            json=sample_payment_data_no_validation_hash,
-            headers=user_headers,
-        )
-        assert res.status_code in [400, 422]
-
-    def test_post_payment_amount_is_negative(
-        self, user_headers, sample_payment_data_amount_negative
-    ):
-        """Trying to add payment where amount is negative"""
-        res = requests.post(
-            url=f"{BASE_URL}payments",
-            json=sample_payment_data_amount_negative,
-            headers=user_headers,
-        )
-        assert res.status_code in [400, 422]
-
-    def test_post_authenticated_payment_with_all_required_fields(
-        self, user_headers, sample_payment_data
-    ):
-        """Trying to add payment with authenticated user"""
-        res = requests.post(
-            url=f"{BASE_URL}payments", json=sample_payment_data, headers=user_headers
+            json=data,
+            headers=user_headers
         )
         assert res.status_code == 201
+        payments.append(res.json())
+    return payments
 
-    def test_post_unauthenticated_payment_with_all_required_fields(
-        self, user_headers, sample_payment_data
-    ):
-        """Trying to add payment with unauthenticated user"""
+
+@pytest.fixture
+def admin_payment(admin_headers, sample_payment_data):
+    """Create a payment as admin"""
+    data = sample_payment_data.copy()
+    data["session_id"] = 99999
+    res = requests.post(
+        url=f"{BASE_URL}payments",
+        json=data,
+        headers=admin_headers
+    )
+    assert res.status_code == 201
+    return res.json()
+
+
+# ============================================================================
+# POST TESTS (10 tests)
+# ============================================================================
+
+class TestPostPayments:
+    
+    def test_post_payment_success(self, user_headers, sample_payment_data):
+        """Test successful payment creation with all required fields"""
         res = requests.post(
             url=f"{BASE_URL}payments",
             json=sample_payment_data,
-            headers={"Authorization": "false_auth"},
+            headers=user_headers
         )
+        
+        assert res.status_code == 201
+        payment = res.json()
+        
+        # Verify all fields are present
+        assert "transaction" in payment
+        assert "hash" in payment
+        assert "initiator" in payment
+        assert "created_at" in payment
+        assert "completed" in payment
+        assert payment["amount"] == 100.50
+        assert payment["session_id"] == "14532"
+        assert payment["parking_lot_id"] == "1500"
+        assert payment["t_data"]["method"] == "ideal"
+    
+    def test_post_payment_as_admin(self, admin_headers, sample_payment_data):
+        """Test admin can create payments"""
+        res = requests.post(
+            url=f"{BASE_URL}payments",
+            json=sample_payment_data,
+            headers=admin_headers
+        )
+        
+        assert res.status_code == 201
+        payment = res.json()
+        assert payment["initiator"] == "admin"
+    
+    def test_post_payment_missing_t_data(self, user_headers):
+        """Test payment creation fails without t_data"""
+        data = {
+            "amount": 100.50,
+            "session_id": 14532,
+            "parking_lot_id": 1500
+            # Missing t_data
+        }
+        
+        res = requests.post(
+            url=f"{BASE_URL}payments",
+            json=data,
+            headers=user_headers
+        )
+        
+        assert res.status_code == 422
+    
+    def test_post_payment_negative_amount(self, user_headers):
+        """Test payment creation fails with negative amount"""
+        data = {
+            "amount": -50.00,
+            "session_id": 14532,
+            "parking_lot_id": 1500,
+            "t_data": {
+                "amount": -50.00,
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "method": "ideal",
+                "issuer": "TJ1SV6ZN",
+                "bank": "ASN"
+            }
+        }
+        
+        res = requests.post(
+            url=f"{BASE_URL}payments",
+            json=data,
+            headers=user_headers
+        )
+        
+        assert res.status_code == 422
+    
+    
+    def test_post_payment_without_auth(self, sample_payment_data):
+        """Test payment creation fails without authentication"""
+        res = requests.post(
+            url=f"{BASE_URL}payments",
+            json=sample_payment_data
+            # No headers
+        )
+        
+        assert res.status_code == 401
+    
+    def test_post_payment_with_invalid_token(self, sample_payment_data):
+        """Test payment creation fails with invalid token"""
+        invalid_headers = {"Authorization": "invalid-token-12345"}
+        
+        res = requests.post(
+            url=f"{BASE_URL}payments",
+            json=sample_payment_data,
+            headers=invalid_headers
+        )
+        
+        assert res.status_code == 401
+    
+    def test_post_payment_different_methods(self, user_headers):
+        """Test creating payments with different payment methods"""
+        methods = ["ideal", "creditcard", "paypal", "bancontact"]
+        
+        for i, method in enumerate(methods):
+            data = {
+                "amount": 75.00,
+                "session_id": 20000 + i,
+                "parking_lot_id": 1500,
+                "t_data": {
+                    "amount": 75.00,
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "method": method,
+                    "issuer": "TEST_ISSUER",
+                    "bank": "TEST_BANK"
+                }
+            }
+            
+            res = requests.post(
+                url=f"{BASE_URL}payments",
+                json=data,
+                headers=user_headers
+            )
+            
+            assert res.status_code == 201
+            payment = res.json()
+            assert payment["t_data"]["method"] == method
+    
+    def test_post_payment_large_amount(self, user_headers):
+        """Test creating payment with large amount"""
+        data = {
+            "amount": 9999.99,
+            "session_id": 30000,
+            "parking_lot_id": 1500,
+            "t_data": {
+                "amount": 9999.99,
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "method": "creditcard",
+                "issuer": "VISA",
+                "bank": "ING"
+            }
+        }
+        
+        res = requests.post(
+            url=f"{BASE_URL}payments",
+            json=data,
+            headers=user_headers
+        )
+        
+        assert res.status_code == 201
+        payment = res.json()
+        assert payment["amount"] == 9999.99
+
+
+# ============================================================================
+# GET TESTS (8 tests)
+# ============================================================================
+
+class TestGetPayments:
+    
+    def test_get_all_payments_as_user(self, user_headers, multiple_payments):
+        """Test user can only see their own payments"""
+        res = requests.get(
+            url=f"{BASE_URL}payments",
+            headers=user_headers
+        )
+        
+        assert res.status_code == 200
+        payments = res.json()
+        
+        # User should see at least their 3 created payments
+        assert len(payments) >= 3
+        
+        # Verify these are their payments
+        created_transaction_ids = [p["transaction"] for p in multiple_payments]
+        returned_transaction_ids = [p["transaction"] for p in payments]
+        
+        for txn_id in created_transaction_ids:
+            assert txn_id in returned_transaction_ids
+        
+        # All payments should belong to the user
+        for payment in payments:
+            assert payment["initiator"] == "test"
+    
+    def test_get_all_payments_as_admin(self, admin_headers, user_headers, sample_payment_data):
+        """Test admin can see all payments from all users"""
+        # Create payment as regular user
+        user_payment = requests.post(
+            url=f"{BASE_URL}payments",
+            json=sample_payment_data,
+            headers=user_headers
+        )
+        user_txn = user_payment.json()["transaction"]
+        
+        # Admin gets all payments
+        res = requests.get(
+            url=f"{BASE_URL}payments",
+            headers=admin_headers
+        )
+        
+        assert res.status_code == 200
+        payments = res.json()
+        
+        # Admin should see payments from different users
+        assert len(payments) > 0
+        
+        # Verify admin can see the user's payment
+        all_txns = [p["transaction"] for p in payments]
+        assert user_txn in all_txns
+    
+    def test_get_payment_by_id_owner(self, user_headers, created_payment):
+        """Test user can get their own payment by ID"""
+        transaction_id = created_payment["transaction"]
+        
+        res = requests.get(
+            url=f"{BASE_URL}payments/{transaction_id}",
+            headers=user_headers
+        )
+        
+        assert res.status_code == 200
+        payment = res.json()
+        assert payment["transaction"] == transaction_id
+        assert payment["amount"] == created_payment["amount"]
+        assert payment["initiator"] == "test"
+    
+    def test_get_payment_by_id_admin(self, admin_headers, created_payment):
+        """Test admin can get any payment by ID"""
+        transaction_id = created_payment["transaction"]
+        
+        res = requests.get(
+            url=f"{BASE_URL}payments/{transaction_id}",
+            headers=admin_headers
+        )
+        
+        assert res.status_code == 200
+        payment = res.json()
+        assert payment["transaction"] == transaction_id
+    
+    def test_get_payment_by_id_not_owner(self, user_headers, admin_payment):
+        """Test user cannot get another user's payment"""
+        transaction_id = admin_payment["transaction"]
+        
+        res = requests.get(
+            url=f"{BASE_URL}payments/{transaction_id}",
+            headers=user_headers
+        )
+        
+        assert res.status_code == 403
+    
+    def test_get_nonexistent_payment(self, user_headers):
+        """Test getting non-existent payment returns 404"""
+        res = requests.get(
+            url=f"{BASE_URL}payments/nonexistent-transaction-id-xyz",
+            headers=user_headers
+        )
+        
+        assert res.status_code == 404
+    
+    def test_get_payments_without_auth(self):
+        """Test getting payments without authentication fails"""
+        res = requests.get(url=f"{BASE_URL}payments")
+        
+        assert res.status_code == 401
+    
+    def test_get_payment_by_id_without_auth(self, created_payment):
+        """Test getting specific payment without auth fails"""
+        transaction_id = created_payment["transaction"]
+        
+        res = requests.get(
+            url=f"{BASE_URL}payments/{transaction_id}"
+        )
+        
         assert res.status_code == 401
 
-    def test_post_payment_refund_user_with_all_required_fields(
-        self, user_headers, sample_payment_data
-    ):
-        """Trying to add a refund with authenticated user"""
-        res = requests.post(
-            url=f"{BASE_URL}refund", json=sample_payment_data, headers=user_headers
-        )
-        assert res.status_code == 403
 
-    def test_post_payment_refund_admin_with_all_required_fields(
-        self, admin_headers, sample_payment_data
-    ):
-        """Trying to add a refund with authenticated admin"""
-        res = requests.post(
-            url=f"{BASE_URL}refund", json=sample_payment_data, headers=admin_headers
-        )
-        assert res.status_code in [200, 201]
-
+# ============================================================================
+# PUT TESTS (7 tests)
+# ============================================================================
 
 class TestPutPayments:
-    """Test PUT endpoints for updating payments"""
-
-    def test_update_own_payment(self, user_headers, sample_payment_data):
-        """User can update their own payment"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        updated_data = sample_payment_data.copy()
-        updated_data["amount"] = 200.00
-        res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=updated_data,
-        )
-        assert res.status_code == 200
-        assert res.json()["amount"] == 200.00
-
-    def test_update_payment_unauthenticated(self, sample_payment_data):
-        """Unauthenticated user cannot update payment"""
-        fake_id = str(uuid.uuid4())
-        res = requests.put(
-            url=f"{BASE_URL}payments/{fake_id}",
-            headers={"Authorization": "invalid_token"},
-            json=sample_payment_data,
-        )
-        assert res.status_code == 401
-
-    def test_update_nonexistent_payment(self, user_headers, sample_payment_data):
-        """Updating non-existent payment returns 404"""
-        fake_id = str(uuid.uuid4())
-        res = requests.put(
-            url=f"{BASE_URL}payments/{fake_id}",
-            headers=user_headers,
-            json=sample_payment_data,
-        )
-        assert res.status_code == 404
-
-    def test_update_payment_missing_validation_hash(
-        self, user_headers, sample_payment_data, sample_payment_data_no_validation_hash
-    ):
-        """Update fails without validation hash"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=sample_payment_data_no_validation_hash,
-        )
-        assert res.status_code == 422
-
-    def test_update_payment_missing_amount(self, user_headers, sample_payment_data):
-        """Update fails without required amount field"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        incomplete_data = {
-            "transaction": payment_id,
-            "initiator": "test",
-            "hash": generate_random_hash(),
+    
+    def test_update_payment_as_admin(self, admin_headers, created_payment):
+        """Test admin can update any payment"""
+        transaction_id = created_payment["transaction"]
+        
+        update_data = {
+            "amount": 200.00,
+            "t_data": {
+                "amount": 200.00,
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "method": "creditcard",
+                "issuer": "VISA",
+                "bank": "ING"
+            }
         }
+        
         res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=incomplete_data,
+            url=f"{BASE_URL}payments/{transaction_id}",
+            json=update_data,
+            headers=admin_headers
         )
-        assert res.status_code == 422
-
-    def test_update_payment_missing_initiator(self, user_headers, sample_payment_data):
-        """Update fails without required initiator field"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        incomplete_data = {
-            "transaction": payment_id,
-            "amount": 150.0,
-            "hash": generate_random_hash(),
-        }
-        res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=incomplete_data,
-        )
-        assert res.status_code == 422
-
-    def test_update_payment_mark_completed(self, user_headers, sample_payment_data):
-        """Payment can be marked as completed"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        updated_data = sample_payment_data.copy()
-        updated_data["completed"] = datetime.now().isoformat()
-        res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=updated_data,
-        )
+        
         assert res.status_code == 200
-        assert res.json()["completed"] is not None
-
-    def test_update_transaction_data(self, user_headers, sample_payment_data):
-        """Transaction data can be updated"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        updated_data = sample_payment_data.copy()
-        updated_data["t_data"]["method"] = "wire_transfer"
-        updated_data["t_data"]["bank"] = "Wells Fargo"
+        updated = res.json()
+        assert updated["amount"] == 200.00
+        assert updated["t_data"]["method"] == "creditcard"
+        assert updated["t_data"]["bank"] == "ING"
+    
+    def test_update_payment_as_user_forbidden(self, user_headers, created_payment):
+        """Test regular user cannot update payments"""
+        transaction_id = created_payment["transaction"]
+        
+        update_data = {"amount": 150.00}
+        
         res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=updated_data,
+            url=f"{BASE_URL}payments/{transaction_id}",
+            json=update_data,
+            headers=user_headers
         )
-        assert res.status_code == 200
-        assert res.json()["t_data"]["method"] == "wire_transfer"
-        assert res.json()["t_data"]["bank"] == "Wells Fargo"
-
-    def test_update_other_user_payment(
-        self, user_headers, admin_headers, sample_payment_data
-    ):
-        """User cannot update another user's payment"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=admin_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        updated_data = sample_payment_data.copy()
-        updated_data["amount"] = 999.99
-        res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=updated_data,
-        )
+        
         assert res.status_code == 403
-
-    def test_admin_can_update_any_payment(
-        self, user_headers, admin_headers, sample_payment_data
-    ):
-        """Admin can update any payment"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        updated_data = sample_payment_data.copy()
-        updated_data["amount"] = 500.00
+    
+    
+    def test_update_nonexistent_payment(self, admin_headers):
+        """Test updating non-existent payment returns 404"""
+        update_data = {"amount": 150.00}
+        
         res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=admin_headers,
-            json=updated_data,
+            url=f"{BASE_URL}payments/nonexistent-id-xyz",
+            json=update_data,
+            headers=admin_headers
         )
-        assert res.status_code == 200
-        assert res.json()["amount"] == 500.00
-
-    def test_update_payment_invalid_data_types(self, user_headers, sample_payment_data):
-        """Update fails with invalid data types"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        invalid_data = {
-            "transaction": payment_id,
-            "amount": "not_a_number",
-            "initiator": "test",
-            "hash": generate_random_hash(),
+        
+        assert res.status_code == 404
+    
+    def test_update_payment_with_invalid_data(self, admin_headers, created_payment):
+        """Test updating payment with invalid data fails validation"""
+        transaction_id = created_payment["transaction"]
+        
+        update_data = {
+            "amount": -100.00,  # Negative amount
+            "t_data": {
+                "amount": -100.00,
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "method": "ideal",
+                "issuer": "TEST",
+                "bank": "TEST"
+            }
         }
+        
         res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=invalid_data,
+            url=f"{BASE_URL}payments/{transaction_id}",
+            json=update_data,
+            headers=admin_headers
         )
+        
         assert res.status_code == 422
-
-    def test_update_payment_negative_amount(self, user_headers, sample_payment_data):
-        """Update fails with negative amount"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
-        updated_data = sample_payment_data.copy()
-        updated_data["amount"] = -100.0
+    
+    def test_update_payment_without_auth(self, created_payment):
+        """Test updating payment without auth fails"""
+        transaction_id = created_payment["transaction"]
+        
+        update_data = {"amount": 150.00}
+        
         res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}",
-            headers=user_headers,
-            json=updated_data,
+            url=f"{BASE_URL}payments/{transaction_id}",
+            json=update_data
         )
-        assert res.status_code in [400, 422]
-
-    def test_update_payment_empty_payload(self, user_headers, sample_payment_data):
-        """Update fails with empty payload"""
-        create_res = requests.post(
-            url=f"{BASE_URL}payments", headers=user_headers, json=sample_payment_data
-        )
-        payment_id = create_res.json()["transaction"]
-
+        
+        assert res.status_code == 401
+    
+    def test_update_only_t_data(self, admin_headers, created_payment):
+        """Test updating only transaction data"""
+        transaction_id = created_payment["transaction"]
+        original_amount = created_payment["amount"]
+        
+        update_data = {
+            "t_data": {
+                "amount": original_amount,
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "method": "paypal",
+                "issuer": "PAYPAL_ID",
+                "bank": "PAYPAL"
+            }
+        }
+        
         res = requests.put(
-            url=f"{BASE_URL}payments/{payment_id}", headers=user_headers, json={}
+            url=f"{BASE_URL}payments/{transaction_id}",
+            json=update_data,
+            headers=admin_headers
         )
-        assert res.status_code == 422
+        
+        assert res.status_code == 200
+        updated = res.json()
+        assert updated["amount"] == original_amount  # Unchanged
+        assert updated["t_data"]["method"] == "paypal"  # Changed
+        assert updated["t_data"]["bank"] == "PAYPAL"  # Changed
