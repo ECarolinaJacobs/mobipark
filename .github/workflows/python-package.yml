@@ -41,6 +41,3 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
-      run: |
-        fastapi dev main.py
-        pytest
