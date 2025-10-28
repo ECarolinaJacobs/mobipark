@@ -105,3 +105,9 @@ def load_discounts_data():
 
 def save_discounts_data(data):
     save_data("data/discounts.csv", data)
+
+def save_parking_session_data(data, lid):
+    save_data(f"data/pdata/p{lid}-sessions.json", data)
+
+def load_parking_session_data(lid):
+    return load_data(f"data/pdata/p{lid}-sessions.json")
