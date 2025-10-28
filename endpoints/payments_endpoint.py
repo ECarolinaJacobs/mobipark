@@ -241,12 +241,6 @@ def update_payment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have permissions to update payments"
             )
-        if payment_update.amount < 0 or payment_update.t_data.amount < 0:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail="Transaction/Tdata (amount) cannot be negative"
-            )
-        
         # Load payments
         try:
             payments = load_payment_data()
