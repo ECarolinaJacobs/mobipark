@@ -33,7 +33,7 @@ def require_auth(request: Request) -> Dict[str, str]:
     return session_user
 
 router = APIRouter(
-    tags=["payments"],
+    tags=["parking-lots"],
     responses={
         401: {"description": "Unauthorized - Invalid or missing token"},
         403: {"description": "Forbidden - Insufficient permissions"},
@@ -180,6 +180,12 @@ def stop_parking_session(
     for key, session in parking_sessions.items():
         if session["licenseplate"] == session_data.licenseplate:
 
+            if session["user"] != session_user.get("username") and session_user.get("role") != "ADMIN":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized - invalid or missing session token"
+                )
+
             start_time = datetime.strptime(session["started"], "%d-%m-%Y %H:%M:%S")
             stop_time = datetime.now()
             duration = stop_time - start_time
@@ -189,7 +195,7 @@ def stop_parking_session(
             updated_parking_session_entry = {
                 "licenseplate": session_data.licenseplate,
                 "started": session["started"],
-                "stopped": str(stop_time),
+                "stopped": stop_time.strftime("%d-%m-%Y %H:%M:%S"),
                 "user": session["user"],
                 "duration_minutes": duration_minutes,
                 # Cost should be calculated using calculate_price from session_calculator.py
@@ -199,12 +205,12 @@ def stop_parking_session(
             }
             parking_sessions[key] = updated_parking_session_entry
             break
-    
     if updated_parking_session_entry == None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Not Found - Resource does not exist"
         )
+
     try:
         save_parking_session_data(parking_sessions, parking_lot_id)
     except Exception as e:
