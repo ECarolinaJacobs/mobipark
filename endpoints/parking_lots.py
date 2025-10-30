@@ -3,6 +3,7 @@ from typing import Dict, Optional
 
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Header
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from models.parking_lots_model import ParkingLot, Coordinates, ParkingSessionCreate
 
 from utils.session_manager import get_session
@@ -222,4 +223,40 @@ def stop_parking_session(
     return JSONResponse(
     content=updated_parking_session_entry,
     status_code=status.HTTP_200_OK
+    )
+
+@router.put(
+    "/parking-lots/{parking_lot_id}",
+    summary="Update parking lot entry data",
+    response_description="Update parking lot"
+)
+def update_parking_lot(
+    parking_lot_id: str,
+    parking_lot_data: ParkingLot,
+    session_user: Dict[str, str] = Depends(require_auth)
+):
+    if session_user.get("role") != "ADMIN":
+        return HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized"
+        )
+
+    parking_lots = load_parking_lot_data()
+    if parking_lot_id not in parking_lots:
+        raise HTTPException(404, "Parking lot not found")
+
+    updated_lot_encoded = jsonable_encoder(parking_lot_data)
+    parking_lots[parking_lot_id].update(updated_lot_encoded)
+    
+    try:
+        save_parking_lot_data(parking_lots)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update parking lot"
+        )
+
+    return JSONResponse(
+        content=parking_lots[parking_lot_id],
+        status_code=status.HTTP_200_OK
     )
