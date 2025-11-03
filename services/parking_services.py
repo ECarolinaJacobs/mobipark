@@ -182,7 +182,7 @@ def delete_parking_lot(parking_lot_id: str):
         )
 
 def delete_parking_session(parking_session_id: str, parking_lot_id: str):
-    parking_sessions = storage_utils.load_parking_session_data()
+    parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
 
     if parking_session_id not in parking_sessions:
         raise HTTPException(
@@ -192,7 +192,7 @@ def delete_parking_session(parking_session_id: str, parking_lot_id: str):
     
     parking_sessions.pop(parking_lot_id)
     try:
-        storage_utils.save_parking_session_data(parking_sessions)
+        storage_utils.save_parking_session_data(parking_sessions, parking_lot_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

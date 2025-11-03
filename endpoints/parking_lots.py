@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Dict
 
 from fastapi import APIRouter, Request, HTTPException, Depends, status, Header
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from models.parking_lots_model import ParkingLot, Coordinates, ParkingSessionCreate
 
 from services import parking_services, auth_services
@@ -123,23 +123,17 @@ def delete_parking_lot(parking_lot_id: str, session_user: Dict[str, str] = Depen
     auth_services.verify_admin(session_user)
     parking_services.delete_parking_lot(parking_lot_id)
 
-    return JSONResponse(
-        content={},
-        response_description="Parking lot deleted"
-    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.delete(
     "/parking-lots/{parking_lot_id}/sessions/{parking_session_id}",
     summary="Delete session entry",
     response_description="Deletes a parking session by ID"
 )
-def delete_parking_lot(parking_session_id: str,
+def delete_parking_session(parking_session_id: str,
     parking_lot_id: str, 
     session_user: Dict[str, str] = Depends(auth_services.require_auth)):
     auth_services.verify_admin(session_user)
     parking_services.delete_parking_session(parking_session_id, parking_lot_id)
 
-    return JSONResponse(
-        content={},
-        response_description="Parking lot deleted"
-    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

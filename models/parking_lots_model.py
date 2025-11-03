@@ -13,7 +13,7 @@ class ParkingLot(BaseModel):
     reserved: int
     tariff: float
     daytariff: float
-    created_at: date
+    created_at: str
     coordinates: Coordinates
 
 class ParkingSessionCreate(BaseModel):
