@@ -241,10 +241,15 @@ def update_payment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have permissions to update payments"
             )
-            
-        # OPTIMIZATION: Load only the payment to be updated
+        if payment_update.amount < 0 or payment_update.t_data.amount < 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Transaction/Tdata (amount) cannot be negative"
+            )
+        
+        # Load payments
         try:
-            payment = get_payment_data_by_id(payment_id)
+            payments = load_payment_data()
         except Exception as e:
             logger.error(f"Failed to load payment data: {e}")
             raise HTTPException(
@@ -252,11 +257,21 @@ def update_payment(
                 detail="Failed to load payment data"
             )
         
-        if not payment:
+        # Find the payment by transaction ID
+        payment_index = None
+        for i, payment in enumerate(payments):
+            if payment["transaction"] == payment_id:
+                payment_index = i
+                break
+        
+        if payment_index is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Payment with transaction id {payment_id} not found"
             )
+        
+        # Get the existing payment
+        payment = payments[payment_index]
         
         # Apply partial update (only fields that were explicitly set)
         update_data = payment_update.model_dump(exclude_unset=True)
@@ -265,7 +280,6 @@ def update_payment(
         if "t_data" in update_data and update_data["t_data"]:
             if "t_data" not in payment:
                 payment["t_data"] = {}
-            # Ensure we update the dictionary in the payment object, not overwrite it
             payment["t_data"].update(update_data["t_data"])
             del update_data["t_data"]
         
@@ -275,12 +289,13 @@ def update_payment(
         if "parking_lot_id" in update_data:
             update_data["parking_lot_id"] = str(update_data["parking_lot_id"])
         
-        # Update other fields in the existing payment object
+        # Update other fields
         payment.update(update_data)
         
-        # OPTIMIZATION: Persist the single updated payment directly
+        # Persist changes
         try:
-            update_existing_payment_in_db(payment_id, payment)
+            payments[payment_index] = payment
+            save_payment_data(payments)
         except Exception as e:
             logger.error(f"Failed to save payment update: {e}")
             raise HTTPException(
