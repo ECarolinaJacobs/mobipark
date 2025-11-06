@@ -2,11 +2,16 @@ from datetime import datetime
 from typing import Dict
 
 from fastapi import HTTPException, status, Depends
-from fastapi.encoders import jsonable_encoder
 
 from models.parking_lots_model import ParkingLot, ParkingSessionCreate, UpdateParkingLot
 from services import auth_services
 from utils import storage_utils
+
+# TODO: DE/INCREMENT RESERVED FIELD FOR PARKING LOTS WHEN A SESSION IS CREATED/DELETED
+# TODO: VALIDATE INPUT
+# TODO: FORMAT DATETIME TO ISO 8601
+# TODO: CALCULATE COST OF SESSION
+# TODO: UPDATE PAYMENT STATUS
 
 def create_parking_lot(parking_lot: ParkingLot, session_user: Dict[str, str] = Depends(auth_services.require_auth)):
     parking_lots = storage_utils.load_parking_lot_data()
@@ -105,11 +110,6 @@ def start_parking_session(
 def stop_parking_session(parking_lot_id: str,
     session_data: ParkingSessionCreate,
     session_user: Dict[str, str] = Depends(auth_services.require_auth)):
-    # TODO: Add parking lot ID
-    # TODO: Check for valid token
-    # TODO: Calculate cost of session
-    # TODO: Update payment status
-    # TODO: Search by session id, rather than username
 
     updated_parking_session_entry = None
     parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)

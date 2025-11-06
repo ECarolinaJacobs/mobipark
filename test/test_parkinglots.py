@@ -3,6 +3,9 @@ import requests
 import json
 from test.test_utils import create_user, delete_user, get_session, delete_parking_lot, find_parking_lot_id_by_name, find_parking_session_id_by_plate, delete_parking_session, url
 
+    # TODO: TEST EDGE CASES
+    
+
     # POST ENDPOINTS #
 
 def test_create_parking_lot():
