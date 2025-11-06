@@ -181,4 +181,18 @@ def test_get_sessions_admin():
     delete_user()
 
 def test_get_sessions_user():
-    pass
+    parking_lot_id = "1"
+    delete_parking_session(parking_lot_id, "TEST-PLATE-1")
+
+    create_user(False)
+    headers = get_session()
+    res1 = requests.post(f"{url}/parking-lots/{parking_lot_id}/sessions/start", json={
+        "licenseplate": "TEST-PLATE-1"
+    },
+    headers=headers)
+
+    res2 = requests.get(f"{url}/parking-lots/{parking_lot_id}/sessions", headers=headers)
+    assert res2.status_code == 200
+
+    delete_parking_session(parking_lot_id, "TEST-PLATE-1")
+    delete_user("test_1")
