@@ -76,12 +76,26 @@ def start_parking_session(
     session_data: ParkingSessionCreate,
     session_user: Dict[str, str] = Depends(auth_services.require_auth)
     ):
+
+    parking_lots = storage_utils.load_parking_lot_data()
+    if parking_lot_id not in parking_lots:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Could not find parking lot"
+        )
+    
+    if parking_lots[parking_lot_id]["reserved"] == parking_lots[parking_lot_id]["capacity"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Parking lot is full"
+        )
+
     parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
     for key, session in parking_sessions.items():
         if session["licenseplate"] == session_data.licenseplate:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="A session for this license plate already exists."
+                detail="A session for this license plate already exists"
             )
 
     new_id = None
@@ -104,12 +118,23 @@ def start_parking_session(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save parking session"
         )
-    
+
+    total_reservations = parking_lots[parking_lot_id]["reserved"]
+    reservations_update = UpdateParkingLot(reserved=(total_reservations + 1))
+    update_parking_lot(parking_lot_id, reservations_update)
+
     return parking_sessions[new_id]
 
 def stop_parking_session(parking_lot_id: str,
     session_data: ParkingSessionCreate,
     session_user: Dict[str, str] = Depends(auth_services.require_auth)):
+
+    parking_lots = storage_utils.load_parking_lot_data()
+    if parking_lot_id not in parking_lots:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Could not find parking lot"
+        )
 
     updated_parking_session_entry = None
     parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
@@ -155,6 +180,9 @@ def stop_parking_session(parking_lot_id: str,
             detail="Failed to update parking session"
         )
     
+    total_reservations = parking_lots[parking_lot_id]["reserved"]
+    reservations_update = UpdateParkingLot(reserved=(total_reservations - 1))
+    update_parking_lot(parking_lot_id, reservations_update)
     return updated_parking_session_entry
     
 def delete_parking_lot(parking_lot_id: str):
