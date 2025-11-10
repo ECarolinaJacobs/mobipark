@@ -11,7 +11,7 @@ from utils import storage_utils, misc
 # DONE: DE/INCREMENT RESERVED FIELD FOR PARKING LOTS WHEN A SESSION IS CREATED/DELETED
 # TODO: VALIDATE INPUT
 # DONE: FORMAT DATETIME TO ISO 8601
-# TODO: CALCULATE COST OF SESSION
+# DONE: CALCULATE COST OF SESSION
 # TODO: UPDATE PAYMENT STATUS
 
 def create_parking_lot(parking_lot: ParkingLot, session_user: Dict[str, str] = Depends(auth_services.require_auth)):
