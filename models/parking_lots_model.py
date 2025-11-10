@@ -35,17 +35,18 @@ class UpdateParkingLot(BaseModel):
 class ParkingSessionCreate(BaseModel):
     licenseplate: str
 
-class OngoingParkingSession(BaseModel):
-    licenseplate: str
-    started: str
-    stopped: str
-    user: str
+class UpdateParkingSessionOngoing(BaseModel):
+    licenseplate: Optional[str] = None
+    started: Optional[str] = None
+    stopped: Optional[str] = None
+    user: Optional[str] = None
 
-class FinishedParkingSession(BaseModel):
-    licenseplate: str
-    started: str
-    stopped: str
-    user: str
-    duration_minutes: int
-    cost: float
-    payment_status: str
+
+class UpdateParkingSessionFinished(BaseModel):
+    licenseplate: Optional[str] = None
+    started: Optional[str] = None
+    stopped: Optional[str] = None
+    user: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    cost: Optional[float] = None
+    payment_status: Optional[str] = None

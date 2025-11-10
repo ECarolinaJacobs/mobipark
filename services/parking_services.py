@@ -3,11 +3,11 @@ from typing import Dict
 
 from fastapi import HTTPException, status, Depends
 
-from models.parking_lots_model import ParkingLot, ParkingSessionCreate, UpdateParkingLot
+from models.parking_lots_model import ParkingLot, ParkingSessionCreate, UpdateParkingLot, UpdateParkingSessionOngoing, UpdateParkingSessionFinished
 from services import auth_services
 from utils import storage_utils
 
-# TODO: DE/INCREMENT RESERVED FIELD FOR PARKING LOTS WHEN A SESSION IS CREATED/DELETED
+# DONE: DE/INCREMENT RESERVED FIELD FOR PARKING LOTS WHEN A SESSION IS CREATED/DELETED
 # TODO: VALIDATE INPUT
 # TODO: FORMAT DATETIME TO ISO 8601
 # TODO: CALCULATE COST OF SESSION
@@ -70,6 +70,37 @@ def update_parking_lot(parking_lot_id: str, parking_lot_update: UpdateParkingLot
         )
     
     return parking_lots[parking_lot_id]
+
+def update_parking_session(
+    parking_lot_id: str,
+    parking_session_id: str,
+    parking_session_update: ParkingSessionCreate):
+
+    parking_lots = storage_utils.load_parking_lot_data()
+    if parking_lot_id not in parking_lots:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Could not find parking lot"
+        )
+    
+    parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
+    if parking_session_id not in parking_sessions:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Could not find parking session"
+        )
+    
+    parking_session = parking_sessions[parking_session_id]
+    update_data = parking_session_update.model_dump(exclude_unset=True)
+    parking_session.update(update_data)
+    
+    try:
+        storage_utils.save_parking_session_data(parking_sessions, parking_lot_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update parking session"
+        )
 
 def start_parking_session(
     parking_lot_id: str,
