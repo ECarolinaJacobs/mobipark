@@ -49,7 +49,7 @@ def test_start_and_stop_session():
 
     assert res.status_code == 200
     delete_user()
-    #delete_parking_session(parking_lot_id)
+    delete_parking_session(parking_lot_id)
 
 def test_stop_session_wrong_user():
     parking_lot_id = 1
