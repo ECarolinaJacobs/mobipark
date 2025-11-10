@@ -9,8 +9,8 @@ from utils.session_manager import get_session
 router = APIRouter(tags=["vehicles"])
 
 # use this path for testing
-# DATA_PATH = "data/vehicles_converted.json"
-DATA_PATH = "data/vehicles.json"
+DATA_PATH = "data/vehicles_converted.json"
+# DATA_PATH = "data/vehicles.json"
 
 
 @router.post("/vehicles", response_model=VehicleOut)
@@ -23,7 +23,7 @@ def create_vehicle(payload: VehicleCreate, authorization: Optional[str] = Header
     vehicles = load_json(DATA_PATH)
     uvehicles = vehicles.get(session_user["username"], {})
 
-    lid = payload.license_plate.replace("-", "")
+    lid = payload.license_plate.replace("-", "").upper()
     if lid in uvehicles:
         raise HTTPException(status_code=400, detail="Vehicle already exists")
     new_vehicle = VehicleOut(
@@ -74,6 +74,8 @@ def update_vehicle(license_plate: str, payload: VehicleCreate, authorization: Op
     session_user = get_session(token)
     vehicles = load_json(DATA_PATH)
     lid = license_plate.replace("-", "").upper()
+    print("Lid initial is" + lid)
+
     # find the owner for this vehicle
     owner_username = None
     for username, user_vehicles in vehicles.items():
@@ -82,9 +84,14 @@ def update_vehicle(license_plate: str, payload: VehicleCreate, authorization: Op
             owner_username = username
             lid = normalized_keys[lid]
             break
+
     if not owner_username:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    if owner_username != session_user["username"]:
+
+    print(f"Owner is {owner_username}")
+    print("Lid changed is" + lid)
+
+    if owner_username != session_user["username"] and session_user.get("role") != "ADMIN":
         raise HTTPException(status_code=403, detail="Forbidden: cannot modify another user's vehicle")
     vehicle = vehicles[owner_username][lid]
     vehicle["name"] = payload.name
@@ -147,7 +154,7 @@ def get_vehicle_history(license_plate: str, authorization: Optional[str] = Heade
     vehicles = load_json(DATA_PATH)
     uvehicles = vehicles.get(session_user["username"], {})
 
-    lid = license_plate.replace("-", "")
+    lid = license_plate.replace("-", "").upper()
     if lid not in uvehicles:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return {"history": []}  # probably a placeholder until sessions or billig module integration

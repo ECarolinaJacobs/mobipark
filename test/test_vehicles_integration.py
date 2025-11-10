@@ -1,28 +1,45 @@
 import requests
 import pytest
 from utils.session_manager import add_session
+from utils.storage_utils import load_user_data, save_user_data
+import time
 
 
 url = "http://localhost:8000/"
 
-USER_TOKEN = "mock-user-token"
-ADMIN_TOKEN = "mock-admin-token"
-
-USER_ACCOUNT = {"username": "mock_user", "role": "USER"}
-ADMIN_ACCOUNT = {"username": "mock_admin", "role": "ADMIN"}
-
-
-@pytest.fixture(autouse=True)
-def setup_mock_sessions():
-    add_session(USER_TOKEN, USER_ACCOUNT)
-    add_session(ADMIN_TOKEN, ADMIN_ACCOUNT)
-
 
 # register and login helper method, returns authentication headers for testing purposes
-def register_login(username="vehicle_user", password="123"):
-    if "admin" in username:
-        return {"Authorization": ADMIN_TOKEN}
-    return {"Authorization": USER_TOKEN}
+def register_login(username="vehicle_user", password="123", name=None, role="USER"):
+    name = name or username
+    register_data = {"username": username, "password": password, "name": name}
+    res = requests.post(f"{url}/auth/register", json=register_data)
+
+    if res.status_code == 400 and "Username already exists" in res.text:
+        login_data = {"username": username, "password": password}
+        res = requests.post(f"{url}/auth/login", json=login_data)
+
+    assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
+    token = res.json().get("session_token")
+    assert token, f"No token received from auth response: {res.text}"
+    return {"Authorization": token}
+
+
+def register_admin(username="admin_user", password="123", name="Admin"):
+    register_data = {"username": username, "password": password, "name": name}
+    res = requests.post(f"{url}/auth/register", json=register_data)
+    if res.status_code == 400 and "Username already exists" in res.text:
+        pass
+    users = load_user_data()
+    for user in users:
+        if user["username"] == username:
+            user["role"] = "ADMIN"
+            save_user_data(users)
+            break
+    login_data = {"username": username, "password": password}
+    res = requests.post(f"{url}/auth/login", json=login_data)
+    token = res.json().get("session_token")
+    assert token, f"Admin login failed: {res.text}"
+    return {"Authorization": token}
 
 
 """ POST vehicles endpoint tests"""
@@ -52,15 +69,16 @@ def test_missing_fields():
 
 # test passed if creating new vehicle returns 201 with status success
 def test_vehicle_creation_success():
-    headers = register_login("vehicle_user_new", "123")
-    data = {"name": "My car", "license_plate": "AF-12-CD"}
+    headers = register_login(f"vehicle_user_new{int(time.time())}", "123")
+    unique_plate = f"AA-{int(time.time()) % 90:02d}-AA"
+    data = {"name": "My car", "license_plate": unique_plate}
     res = requests.post(f"{url}/vehicles", json=data, headers=headers)
-    assert res.status_code == 200
     body = res.json()
-    assert body["license_plate"] == "AF-12-CD"
+    assert body["license_plate"] == unique_plate
     assert body["name"] == "My car"
     assert "created_at" in body
     assert "updated_at" in body  # changed to support vehicle out model return.
+    assert res.status_code == 200
 
 
 # test passed when creating the same vehicle twice, returns 400
@@ -102,20 +120,35 @@ def test_update_nonvehicle():
     # changed because the api doesnt make a new vehicle anymore if input is missing, just returns error
 
 
-# test passed if an existing vehicles name is updated successfully
+# test passed if admin can update vehicle name of another user's vehicle
 def test_update_vehicle_existing_name():
-    headers = register_login("put_user3", "123")
-    create_data = {"name": "real car", "license_plate": "GP-33-CD"}
-    requests.post(f"{url}/vehicles", json=create_data, headers=headers)
-    lid = "GP33CD"
-    # update name
-    update_data = {"name": "new car", "license_plate": "GP-33-CD"}
-    res = requests.put(f"{url}/vehicles/{lid}", json=update_data, headers=headers)
-    assert res.status_code == 200
-    body = res.json()
-    assert body["name"] == "new car"
-    assert body["license_plate"] == "GP-33-CD"
+    # Create admin user
+    admin_headers = register_admin("admin_update_test", "123", "Admin")
+
+    # Create normal user and their vehicle
+    user_headers = register_login("normal_update_user", "123")
+    unique_plate = f"UU-{int(time.time()) % 90:02d}-UU"
+    create_data = {"name": "Original Name", "license_plate": unique_plate}
+    create_res = requests.post(f"{url}/vehicles", json=create_data, headers=user_headers)
+    assert create_res.status_code == 200
+
+    # Admin updates the vehicle name
+    lid = unique_plate.replace("-", "").upper()
+    update_data = {"name": "Updated Name", "license_plate": unique_plate}
+    update_res = requests.put(f"{url}/vehicles/{lid}", json=update_data, headers=admin_headers)
+
+    assert update_res.status_code == 200
+    body = update_res.json()
+    assert body["name"] == "Updated Name"
+    assert body["license_plate"] == unique_plate
     assert "updated_at" in body
+
+    # Verify the update persisted by fetching the vehicle
+    get_res = requests.get(f"{url}/vehicles/normal_update_user", headers=admin_headers)
+    assert get_res.status_code == 200
+    vehicles = get_res.json()
+    assert lid in vehicles
+    assert vehicles[lid]["name"] == "Updated Name"
 
 
 # test passed if token invalid returns 401
@@ -190,7 +223,7 @@ def test_get_list():
 # added test for get/vehicles/{username} (admin route)
 # test passed if admin can retrieve vehicle of certain user (returns 200)
 def test_admin_view_user_vehicles():
-    admin_headers = register_login("admin_user", "123")
+    admin_headers = register_admin("admin_user", "123", "Admin")
     user_headers = register_login("normal_user", "123")
     # normal user creates vehicle
     data = {"name": "UserCar", "license_plate": "99-XY-9"}
