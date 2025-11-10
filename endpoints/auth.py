@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Response, HTTPException, status
 from utils.session_manager import add_session, remove_session, get_session
-from utils.storage_utils import load_user_data, save_user_data
+from utils.storage_utils import load_user_data_from_db, save_user_data_to_db
 import uuid, hashlib, secrets
 from models.auth_model import LoginRequest, RegisterRequest, User
 
@@ -18,7 +18,7 @@ def login(login_data: LoginRequest, response: Response):
         )
 
     hashed_password = hashlib.md5(password.encode()).hexdigest()
-    users = load_user_data()
+    users = load_user_data_from_db()
     
     for user in users:
         if user.get("username") == username and user.get("password") == hashed_password:
@@ -48,7 +48,7 @@ def register(register_data: RegisterRequest, response: Response):
             detail="Missing credentials"
         )
     
-    users = load_user_data()
+    users = load_user_data_from_db()
     
     if any(user.get("username") == username for user in users):
         raise HTTPException(
@@ -73,7 +73,7 @@ def register(register_data: RegisterRequest, response: Response):
     # Save user to database
     users.append(new_user)
     
-    save_user_data(users)
+    save_user_data_to_db(users)
     
     token = str(uuid.uuid4())
     add_session(token, new_user)
