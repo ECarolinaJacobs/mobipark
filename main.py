@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from endpoints.auth import router as auth_router
 from endpoints.payments_endpoint import router as payment_router
-from endpoints.vehicles import router as vehicle_router
+from endpoints.vehicles_endpoint import router as vehicle_router
 from endpoints.parking_lots import router as parking_lots_router
 
 
