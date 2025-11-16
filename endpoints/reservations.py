@@ -1,10 +1,9 @@
 from fastapi import APIRouter, HTTPException, Request, status, Depends
 from fastapi.responses import JSONResponse
 from typing import Dict
-
 from models.reservations_model import CreateReservation, UpdateReservation
 
-from utils.storage_utils import load_reservation_data, save_reservation_data, load_parking_lot_data, save_parking_lot_data
+from utils.storage_utils import load_reservation_data,save_reservation_data,load_parking_lot_data, save_parking_lot_data
 from utils.session_manager import get_session
 
 import logging
@@ -81,8 +80,8 @@ def create_reservation(reservation_data: CreateReservation,session_user: Dict[st
         reservation_data_dict = reservation_data.model_dump()
         reservation_data_dict["id"] = rid
         reservation_data.user = session_user["username"]
-
-        reservations[rid] = reservation_data_dict
+        
+        reservations.append(reservation_data_dict)
         
         parking_lot_id = reservation_data.parking_lot_id
         parking_lots[parking_lot_id]["reserved"] += 1

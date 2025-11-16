@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 class CreateReservation(BaseModel):
-    user : Optional[str]  # Extra field if session user is admin
+    user : Optional[str]  = None # Extra field if session user is admin
     vehicle_id: str
     start_time: str
     end_time: str
