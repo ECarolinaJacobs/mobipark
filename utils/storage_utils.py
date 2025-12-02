@@ -476,7 +476,7 @@ def get_vehicle_data_by_id(vehicle_id: str):
 
 def get_vehicle_data_by_user(user_id: str):
     """Return all vehicles owned by a specific user."""
-    vehicles = load_vehicle_data()
+    vehicles = load_json_from_db("vehicles")
     return [v for v in vehicles if v.get("user_id") == user_id]
 
 
@@ -500,50 +500,28 @@ def save_new_vehicle_to_db(vehicle_data: Dict):
 
 
 def update_existing_vehicle_in_db(vehicle_id: str, vehicle_data: Dict):
-    """
-    Update an existing vehicle entry by ID or license plate.
-    """
-    vehicles = load_vehicle_data()
-    updated = False
-
-    for idx, v in enumerate(vehicles):
-        if (
-            v.get("id") == vehicle_id
-            or v.get("license_plate", "").replace("-", "").upper() == vehicle_id.upper()
-        ):
-            vehicles[idx] = vehicle_data
-            updated = True
-            break
-
-    if not updated:
-        raise ValueError(f"No vehicle found with ID {vehicle_id}")
-
-    save_vehicle_data(vehicles)
+    update_single_json_in_db("vehicles", "id", vehicle_id, vehicle_data)
 
 
 def delete_vehicle_from_db(vehicle_id: str):
-    """
-    Delete a vehicle from vehicles.json by its ID or license plate.
-    Returns True if deleted, False otherwise.
-    """
-    vehicles = load_vehicle_data()
-    new_vehicles = [
-        v
-        for v in vehicles
-        if not (
-            v.get("id") == vehicle_id
-            or v.get("license_plate", "").replace("-", "").upper() == vehicle_id.upper()
-        )
-    ]
-
-    if len(new_vehicles) == len(vehicles):
-        # nothing was removed
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM vehicles WHERE id == ?", (vehicle_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.OperationalError as e:
+        print(f"Error deleting vehicle: {e}")
         return False
-
-    save_vehicle_data(new_vehicles)
-    return True
 
 
 def get_user_data_by_username_for_vehicles(username: str) -> Optional[Dict]:
-    users = load_user_data()
-    return next((user for user in users if user["username"] == username), None)
+    return load_single_json_from_db("users", "username", username)
+
+
+def load_vehicle_data_from_db():
+    return load_json_from_db("vehicles")
+
+
+def save_vehicle_data_to_db(data):
+    insert_single_json_to_db("vehicles", data)

@@ -5,13 +5,12 @@ import uuid
 
 from models.vehicles_model import VehicleCreate, VehicleOut
 from utils.storage_utils import (
-    load_vehicle_data,
-    get_vehicle_data_by_id,
     get_vehicle_data_by_user,
-    save_new_vehicle_to_db,
     update_existing_vehicle_in_db,
     delete_vehicle_from_db,
     get_user_data_by_username_for_vehicles,
+    load_vehicle_data_from_db,
+    save_vehicle_data_to_db,
 )
 
 
@@ -27,15 +26,13 @@ def normalize_plate(p: str) -> str:
     return p.replace("-", "").upper().strip()
 
 
-def find_vehicle_by_license_plate(
-    vehicles: list, license_plate: str, not_found_msg: str = "Vehicle not found"
-):
-    """Helper function to find a vehicle by lid"""
+def find_vehicle_by_license_plate(license_plate: str):
     lid = normalize_plate(license_plate)
+    vehicles = load_vehicle_data_from_db()
     for v in vehicles:
-        if normalize_plate(v["license_plate"]) == lid:
+        if normalize_plate(v.get("license_plate", "")) == lid:
             return v
-    raise HTTPException(status_code=404, detail=not_found_msg)
+    raise HTTPException(status_code=404, detail="Vehicle not found")
 
 
 @router.post(
@@ -50,7 +47,7 @@ def create_vehicle(payload: VehicleCreate, authorization: Optional[str] = Header
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     session_user = get_session(token)
-    vehicles = load_vehicle_data()
+    vehicles = load_vehicle_data_from_db()
 
     for v in vehicles:
         if normalize_plate(v["license_plate"]) == normalize_plate(payload.license_plate):
@@ -65,32 +62,27 @@ def create_vehicle(payload: VehicleCreate, authorization: Optional[str] = Header
         "year": payload.year,
         "created_at": datetime.now().isoformat(),
     }
-    save_new_vehicle_to_db(new_vehicle)
+    try:
+        save_vehicle_data_to_db(new_vehicle)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Vehicle already exists")
     return new_vehicle
 
 
 @router.get("/vehicles/{username}", response_model=dict)
 @router.get("/vehicles", response_model=dict)
 def get_user_vehicles(username: Optional[str] = None, authorization: Optional[str] = Header(None)):
-    """
-    returns vehicles for the logged in user, if an admin provides a username, returns that users vehicle instead
-    """
     token = authorization
     if not token or not get_session(token):
         raise HTTPException(status_code=401, detail="Unauthorized")
     session_user = get_session(token)
-    # is username not given, use current users username
     if not username:
         username = session_user["username"]
-    # admin check
-    if username != session_user["username"] and session_user.get("role") != "ADMIN":
+    is_admin = session_user.get("role", "").upper() == "ADMIN"
+    if username != session_user["username"] and not is_admin:
         raise HTTPException(status_code=403, detail="Access denied")
-    target_user = get_user_data_by_username_for_vehicles(username)
-    print(target_user)
-    if not target_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user_vehicles = get_vehicle_data_by_user(str(target_user["username"]))
-    return {"vehicles": user_vehicles}
+    vehicles = get_vehicle_data_by_user(username)
+    return {"vehicles": vehicles}
 
 
 @router.put("/vehicles/{license_plate}", response_model=VehicleOut)
@@ -100,45 +92,21 @@ def update_vehicle(license_plate: str, payload: VehicleCreate, authorization: Op
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     session_user = get_session(token)
-    vehicles = load_vehicle_data()
-    print("Lid is " + license_plate.replace("-", "").upper())
-
     # find the owner for this vehicle
-    target_vehicle = find_vehicle_by_license_plate(vehicles, license_plate)
-    vehicle_owner = target_vehicle["user_id"]  # stored as username
-    logged_in_user = session_user["username"]
-
-    print(f"Owner is {vehicle_owner}")
-
-    # only owner or admin can update
-    if logged_in_user != vehicle_owner and session_user.get("role") != "ADMIN":
+    target_vehicle = find_vehicle_by_license_plate(license_plate)
+    if target_vehicle["user_id"] != session_user["username"] and session_user.get("role") != "ADMIN":
         raise HTTPException(status_code=403, detail="Forbidden: cannot modify another users vehicle")
-
-    # update fields
-    target_vehicle["license_plate"] = payload.license_plate
-    target_vehicle["make"] = payload.make
-    target_vehicle["model"] = payload.model
-    target_vehicle["color"] = payload.color
-    target_vehicle["year"] = payload.year
-
-    print("SESSION USER:", session_user)
-    print("OWNER USER:", vehicle_owner)
-
+    target_vehicle.update(
+        {
+            "license_plate": payload.license_plate,
+            "make": payload.make,
+            "model": payload.model,
+            "color": payload.color,
+            "year": payload.year,
+        }
+    )
     update_existing_vehicle_in_db(target_vehicle["id"], target_vehicle)
-
-    try:
-        return VehicleOut(
-            id=target_vehicle["id"],
-            user_id=target_vehicle["user_id"],
-            license_plate=target_vehicle["license_plate"],
-            make=target_vehicle["make"],
-            model=target_vehicle["model"],
-            color=target_vehicle["color"],
-            year=target_vehicle["year"],
-            created_at=datetime.fromisoformat(target_vehicle["created_at"]),
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal data error: {str(e)}")
+    return target_vehicle
 
 
 @router.delete("/vehicles/{license_plate}")
@@ -147,15 +115,16 @@ def delete_vehicle(license_plate: str, authorization: Optional[str] = Header(Non
     if not token or not get_session(token):
         raise HTTPException(status_code=401, detail="Unauthorized")
     session_user = get_session(token)
-    vehicles = load_vehicle_data()
     # find target vehicle
-    target_vehicle = find_vehicle_by_license_plate(vehicles, license_plate)
-    if target_vehicle["user_id"] != str(session_user["username"]) and session_user.get("role") != "ADMIN":
+    target_vehicle = find_vehicle_by_license_plate(license_plate)
+    if (
+        target_vehicle["user_id"] != session_user["username"]
+        and session_user.get("role", "").upper() != "ADMIN"
+    ):
         raise HTTPException(status_code=403, detail="Forbidden: cannot delete another users vehicle")
     # performing the deletion
-    success = delete_vehicle_from_db(target_vehicle["id"])
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to delete vehicle")
+    if not delete_vehicle_from_db(target_vehicle["id"]):
+        raise HTTPException(status_code=404, detail="Vehicle not found")
     return {"status": "Deleted"}
 
 
@@ -165,11 +134,12 @@ def get_vehicle_reservations(license_plate: str, authorization: Optional[str] = 
     if not token or not get_session(token):
         raise HTTPException(status_code=401, detail="Unauthorized")
     session_user = get_session(token)
-    vehicles = load_vehicle_data()
-
     # find target vehicle
-    target_vehicle = find_vehicle_by_license_plate(vehicles, license_plate)
-    if target_vehicle["user_id"] != str(session_user["username"]) and session_user.get("role") != "ADMIN":
+    target_vehicle = find_vehicle_by_license_plate(license_plate)
+    if (
+        target_vehicle["user_id"] != str(session_user["username"])
+        and session_user.get("role", "").upper() != "ADMIN"
+    ):
         raise HTTPException(
             status_code=403, detail="Forbidden: cannot access another users vehicle reservations"
         )
@@ -183,9 +153,10 @@ def get_vehicle_history(license_plate: str, authorization: Optional[str] = Heade
     if not token or not get_session(token):
         raise HTTPException(status_code=401, detail="Unauthorized")
     session_user = get_session(token)
-    vehicles = load_vehicle_data()
-
-    target_vehicle = find_vehicle_by_license_plate(vehicles, license_plate)
-    if target_vehicle["user_id"] != str(session_user["username"]) and session_user.get("role") != "ADMIN":
+    target_vehicle = find_vehicle_by_license_plate(license_plate)
+    if (
+        target_vehicle["user_id"] != str(session_user["username"])
+        and session_user.get("role", "").upper() != "ADMIN"
+    ):
         raise HTTPException(status_code=403, detail="Forbidden: cannot access another users vehicle history")
     return {"history": []}

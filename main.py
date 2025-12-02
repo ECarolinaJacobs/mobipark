@@ -4,6 +4,8 @@ from endpoints.payments_endpoint import router as payment_router
 from endpoints.vehicles_endpoint import router as vehicle_router
 from endpoints.parking_lots import router as parking_lots_router
 from endpoints.reservations import router as reservations_router
+from endpoints.billing_endpoint import router as billing_router
+
 
 app = FastAPI()
 
@@ -16,6 +18,7 @@ app.include_router(payment_router)
 app.include_router(auth_router)
 app.include_router(vehicle_router)
 app.include_router(parking_lots_router)
+app.include_router(billing_router)
 
 app.include_router(reservations_router)
 
