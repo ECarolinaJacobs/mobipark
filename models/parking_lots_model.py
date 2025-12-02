@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date, datetime
 from typing import Optional
 
@@ -11,14 +11,14 @@ class UpdateCoordinates(BaseModel):
     lng: Optional[float] = None
 
 class ParkingLot(BaseModel):
-    name: str
-    location: str
-    address: str
-    capacity: int
-    reserved: int
-    tariff: float
-    daytariff: float
-    created_at: str
+    name: str = Field(min_length=1)
+    location: str = Field(min_length=1)
+    address: str = Field(min_length=1)
+    capacity: int = Field(ge=0)
+    reserved: int = Field(ge=0)
+    tariff: float = Field(ge=0)
+    daytariff: float = Field(ge=0)
+    created_at: str = Field(default=datetime.now().isoformat())
     coordinates: Coordinates
 
 class UpdateParkingLot(BaseModel):
