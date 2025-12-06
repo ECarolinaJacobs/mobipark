@@ -1,9 +1,17 @@
 import requests
 import pytest
 import time
-
+import random
+import string
 
 url = "http://localhost:8000/"
+
+
+def valid_plate():
+    letters = "".join(random.choice(string.ascii_uppercase) for _ in range(2))
+    num1 = random.randint(10, 99)
+    num2 = random.randint(10, 99)
+    return f"{letters}-{num1}-{num2}"
 
 
 # register and login helper method, returns authentication headers for testing purposes
@@ -75,7 +83,7 @@ def test_missing_fields():
 # test passed if creating new vehicle returns 201 with status success
 def test_vehicle_creation_success():
     headers = register_login(f"vehicle_user_new{int(time.time())}", "123")
-    unique_plate = f"AA-{int(time.time()) % 90:02d}-AA"
+    unique_plate = valid_plate()
     data = {
         "user_id": "Test",
         "license_plate": unique_plate,
@@ -162,10 +170,9 @@ def test_update_nonvehicle():
 def test_update_vehicle_existing_data_by_admin():
     # Create admin user
     admin_headers = register_admin("admin_update_test", "123", "Admin")
-
     # Create normal user and their vehicle
     user_headers = register_login("normal_update_user", "123")
-    unique_plate = f"UU-{int(time.time()) % 90:02d}-UU"
+    unique_plate = valid_plate()
     create_data = {
         "user_id": "dummy",
         "license_plate": unique_plate,
