@@ -109,7 +109,7 @@ def vehicle_creation_succes_admin():
 
 def test_create_reservation_as_user(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
     assert res.json()["status"] == "Success"
@@ -119,7 +119,7 @@ def test_create_reservation_as_user(vehicle_creation_succes):
 
 def test_create_reservation_as_admin(vehicle_creation_succes_admin):
     vehicle, headers = vehicle_creation_succes_admin
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1", "user_id": USER_LOGIN["username"]}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1", "user_id": USER_LOGIN["username"]}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 201
@@ -130,7 +130,7 @@ def test_create_reservation_as_admin(vehicle_creation_succes_admin):
 
 def test_create_reservation_as_admin_missing_user(vehicle_creation_succes_admin):
     vehicle, headers = vehicle_creation_succes_admin
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 401
@@ -139,7 +139,7 @@ def test_create_reservation_as_admin_missing_user(vehicle_creation_succes_admin)
 
 def test_missing_parking_lot(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z"} 
+    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z"} 
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
@@ -149,7 +149,7 @@ def test_missing_parking_lot(vehicle_creation_succes):
 def test_missing_vehicle_id():
     create_user(False)
     headers = get_session()
-    data = {"start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
@@ -159,7 +159,7 @@ def test_missing_vehicle_id():
 
 def test_missing_start_time(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"], "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
@@ -168,7 +168,7 @@ def test_missing_start_time(vehicle_creation_succes):
 
 def test_missing_end_time(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time":  "2025-12-06T10:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"], "start_time":  "2025-12-06T10:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
@@ -178,7 +178,7 @@ def test_missing_end_time(vehicle_creation_succes):
 def test_incorrect_vehicle_id_format():
     create_user(False)
     headers = get_session()
-    data = {"vehicle_id": "1233456", "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": "1233456", "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
@@ -188,23 +188,23 @@ def test_incorrect_vehicle_id_format():
 
 def test_incorrect_start_time_format(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "123456789", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "123456789", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
-    assert 'Value error, Date must be in iso format: YYYY-MM-DDTHH:MM:SSZ' in res.json()["detail"][0]["msg"]
+    assert 'Value error, Date must be in iso format: YYYY-MM-DDTHH:MMZ' in res.json()["detail"][0]["msg"]
 
 def test_incorrect_end_time_format(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "123456", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "123456", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
-    assert 'Value error, Date must be in iso format: YYYY-MM-DDTHH:MM:SSZ' in res.json()["detail"][0]["msg"]
+    assert 'Value error, Date must be in iso format: YYYY-MM-DDTHH:MMZ' in res.json()["detail"][0]["msg"]
 
 def test_incorrect_parking_lot_id_format(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "Z"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "Z"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 422
@@ -212,7 +212,7 @@ def test_incorrect_parking_lot_id_format(vehicle_creation_succes):
 
 def test_parking_lot_id_not_found_user(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "99999"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "99999"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 404
@@ -220,7 +220,7 @@ def test_parking_lot_id_not_found_user(vehicle_creation_succes):
 
 def test_parking_lot_id_not_found_admin(vehicle_creation_succes_admin):
     vehicle, headers = vehicle_creation_succes_admin
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "99999", "user_id": "test"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "99999", "user_id": "test"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
 
     assert res.status_code == 404
@@ -231,12 +231,12 @@ def test_parking_lot_id_not_found_admin(vehicle_creation_succes_admin):
 
 def test_update_missing_vehicle_id(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"} 
+    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"} 
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
     
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    new_data = {"start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
  
@@ -246,12 +246,12 @@ def test_update_missing_vehicle_id(vehicle_creation_succes):
 
 def test_update_missing_start_time(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"} 
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"} 
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
     
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"vehicle_id": vehicle["id"],"end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    new_data = {"vehicle_id": vehicle["id"],"end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
  
@@ -261,12 +261,12 @@ def test_update_missing_start_time(vehicle_creation_succes):
 
 def test_update_missing_end_time(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"} 
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"} 
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
     
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00:00Z", "parking_lot_id": "1"}
+    new_data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00Z", "parking_lot_id": "1"}
     
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
  
@@ -276,12 +276,12 @@ def test_update_missing_end_time(vehicle_creation_succes):
 
 def test_update_cost_as_user(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"} 
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"} 
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
     
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1", "cost": "4567890"}
+    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1", "cost": "4567890"}
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
 
     assert res_put.status_code == 403
@@ -289,12 +289,12 @@ def test_update_cost_as_user(vehicle_creation_succes):
 
 def test_update_status_as_user(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"} 
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"} 
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
     
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1", "status": "confirmed" }
+    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1", "status": "confirmed" }
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
 
     assert res_put.status_code == 403
@@ -302,12 +302,12 @@ def test_update_status_as_user(vehicle_creation_succes):
 
 def test_update_invalid_status_as_admin(vehicle_creation_succes_admin):
     vehicle, headers = vehicle_creation_succes_admin
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1", "user_id" : vehicle["user_id"]} 
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1", "user_id" : vehicle["user_id"]} 
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
     
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1", "status": "invalid_status", "user_id" : vehicle["user_id"] }
+    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1", "status": "invalid_status", "user_id" : vehicle["user_id"] }
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
     print(res_put.json())
     assert res_put.status_code == 403
@@ -315,7 +315,7 @@ def test_update_invalid_status_as_admin(vehicle_creation_succes_admin):
     
 def test_update_reservation_not_found(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    new_data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.put(f"{URL}/reservations/9999999999999", json=new_data, headers=headers)
 
     assert res.status_code == 404
@@ -323,12 +323,12 @@ def test_update_reservation_not_found(vehicle_creation_succes):
 
 def test_update_reservation_success(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
 
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "2"}
+    new_data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "2"}
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
 
     assert res_put.status_code == 200   
@@ -342,7 +342,7 @@ def test_update_reservation_success(vehicle_creation_succes):
 
 def test_delete_reservation_deletion_succes(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"], "start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
 
@@ -367,7 +367,7 @@ def test_delete_reservation_not_found():
 
 def test_get_reservation_succes(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
-    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00:00Z", "end_time": "2025-12-07T12:00:00Z", "parking_lot_id": "1"}
+    data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00Z", "end_time": "2025-12-07T12:00Z", "parking_lot_id": "1"}
     res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
     assert res.status_code == 201
   
