@@ -1,6 +1,11 @@
 import requests
 import json
+import os
 from utils import storage_utils
+from dotenv import find_dotenv
+
+find_dotenv()
+use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 
 url = "http://localhost:8000/"
 
@@ -14,6 +19,8 @@ def create_user(isAdmin, username="test", password="test"):
 
 def delete_user(username="test"):
     filename = "../data/users.json"
+    if use_mock_data:
+        filename = "../mock_data/mock_users.json"
     with open(filename, "r") as f:
         users = json.load(f)
     
@@ -23,6 +30,8 @@ def delete_user(username="test"):
 
 def update_user_role(username, role):
     filename = "../data/users.json"
+    if use_mock_data:
+        filename = "../mock_data/mock_users.json"
     with open (filename, "r") as f:
         users = json.load(f)
     for user in users:
@@ -33,6 +42,8 @@ def update_user_role(username, role):
 
 def delete_parking_lot(name="TEST_PARKING_LOT"):
     filename = "../data/parking-lots.json"
+    if use_mock_data:
+        filename = "../mock_data/mock_parking-lots.json"
     with open(filename, "r") as f:
         parking_lots = json.load(f)
     
@@ -51,6 +62,8 @@ def delete_parking_session(parking_lot_id: str, license_plate="TEST-PLATE"):
 
 def find_parking_lot_id_by_name():
     filename = "../data/parking-lots.json"
+    if use_mock_data:
+        filename = "../mock_data/mock_parking-lots.json"
     with open(filename, "r") as f:
         parking_lots = json.load(f)
 

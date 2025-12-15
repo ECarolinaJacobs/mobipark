@@ -1,8 +1,13 @@
 import json
+import os
 import csv
 import sqlite3
 from pathlib import Path
 from typing import List, Dict, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
+use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 
 # Define the database path globally
 DB_PATH = Path(__file__).parent / "../data/mobypark.db"
@@ -449,10 +454,14 @@ def save_user_data(data):
 
 
 def load_parking_lot_data():
+    if use_mock_data:
+        return load_data("mock_data/mock_parking-lots.json")
     return load_data("data/parking-lots.json")
 
 
 def save_parking_lot_data(data):
+    if use_mock_data:
+        save_data("mock_data/mock_parking-lots.json", data)
     save_data("data/parking-lots.json", data)
 
 
