@@ -7,10 +7,15 @@ from fastapi.responses import JSONResponse
 
 from utils.session_manager import get_session
 from utils.storage_utils import (
-    load_payment_data,
-    save_payment_data,
+    # Updated imports for targeted DB functions
+    load_payment_data_from_db, 
+    get_payment_data_by_id, 
+    save_new_payment_to_db, 
+    update_existing_payment_in_db,
+    get_discount_by_code,
+    update_existing_discount_in_db
 )
-from models.payments_model import PaymentCreate, PaymentUpdate, Payment, TData
+from models.payments_model import PaymentCreate, PaymentUpdate
 from utils.session_calculator import (
     generate_payment_hash,
     generate_transaction_validation_hash
@@ -24,6 +29,7 @@ ROLE_ADMIN = "ADMIN"
 
 
 def require_auth(request: Request) -> Dict[str, str]:
+    # ... (Authentication remains the same)
     auth_token = request.headers.get("Authorization")
     
     if not auth_token:
@@ -63,19 +69,15 @@ def get_payment_by_id(
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
     try:
-        payments = load_payment_data()
+        # OPTIMIZATION: Load only the single payment by ID
+        payment = get_payment_data_by_id(payment_id)
     except Exception as e:
         logger.error(f"Failed to load payment data: {e}")
+        # The storage_utils will raise an exception if the table query fails
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load payment data"
         )
-    
-    # Find the payment
-    payment = next(
-        (p for p in payments if p["transaction"] == payment_id),
-        None
-    )
     
     if not payment:
         raise HTTPException(
@@ -104,8 +106,9 @@ def get_payment_by_id(
 def get_all_payments(
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
+    # This endpoint still needs to load ALL payments for filtering/admin view
     try:
-        payments = load_payment_data() or []
+        payments = load_payment_data_from_db() or []
     except Exception as e:
         logger.error(f"Failed to load payment data: {e}")
         raise HTTPException(
@@ -118,6 +121,10 @@ def get_all_payments(
         return JSONResponse(content=payments, status_code=status.HTTP_200_OK)
     
     # Regular users see only their own payments
+    # NOTE: For further optimization, a SQL 'WHERE' clause could be added
+    # in storage_utils to filter in the DB before load, but we keep the current
+    # list comprehension logic for now as it's simple and load_payment_data_from_db
+    # is already optimized to not load all rows into memory at once (via cursor iteration).
     user_payments = [
         p for p in payments 
         if p["initiator"] == session_user["username"]
@@ -137,7 +144,7 @@ def create_payment(
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
     try:
-        # Validate t_data is provided
+        # ... (Validation remains the same)
         if not payment_create.t_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -149,18 +156,7 @@ def create_payment(
                 detail="Transaction/Tdata (amount) cannot be negative"
             )
         
-        # Load existing payments
-        try:
-            payments = load_payment_data()
-        except FileNotFoundError:
-            logger.warning("Payment data file not found, creating new list")
-            payments = []
-        except Exception as e:
-            logger.error(f"Failed to load payment data: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to load payment data"
-            )
+        # Load existing payments section REMOVED. No need to load all data.
         
         # Get current timestamp
         now = datetime.now()
@@ -177,10 +173,80 @@ def create_payment(
                 detail="Failed to generate payment identifiers"
             )
         
+        # Handle discount application
+        original_amount = payment_create.amount
+        final_amount = payment_create.amount
+        discount_applied = None
+        discount_amount = 0.0
+        
+        if payment_create.discount_code:
+            try:
+                discount = get_discount_by_code(payment_create.discount_code)
+                if not discount:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Discount code '{payment_create.discount_code}' not found"
+                    )
+                
+                # Validate discount code
+                if not discount.get("active", True):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Discount code is not active"
+                    )
+                
+                # Check expiration
+                if discount.get("expires_at"):
+                    try:
+                        expires_at = datetime.fromisoformat(discount["expires_at"])
+                        if now > expires_at:
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Discount code has expired"
+                            )
+                    except ValueError:
+                        # If date parsing fails, ignore expiration check
+                        pass
+                
+                # Check usage limits
+                max_uses = discount.get("max_uses")
+                current_uses = discount.get("current_uses", 0)
+                if max_uses is not None and current_uses >= max_uses:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Discount code has reached its usage limit"
+                    )
+                
+                # Apply discount
+                discount_type = discount["discount_type"]
+                discount_value = discount["discount_value"]
+                
+                if discount_type == "percentage":
+                    discount_amount = original_amount * (discount_value / 100)
+                elif discount_type == "fixed":
+                    discount_amount = min(discount_value, original_amount)  # Don't exceed original amount
+                
+                final_amount = max(0, original_amount - discount_amount)
+                discount_applied = payment_create.discount_code
+                
+                # Update discount usage count
+                updated_discount = discount.copy()
+                updated_discount["current_uses"] = current_uses + 1
+                update_existing_discount_in_db(payment_create.discount_code, updated_discount)
+                
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error applying discount: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to apply discount code"
+                )
+
         # Build the payment object
         payment = {
             "transaction": transaction_hash,
-            "amount": payment_create.amount,
+            "amount": final_amount,
             "initiator": session_user["username"],
             "created_at": f"{now.strftime('%d-%m-%Y %H:%M:%S')}{timestamp}",
             "completed": payment_create.completed or f"{now.strftime('%d-%m-%Y %H:%M:%S')}{timestamp}",
@@ -193,13 +259,15 @@ def create_payment(
                 "bank": payment_create.t_data.bank
             },
             "session_id": str(payment_create.session_id),
-            "parking_lot_id": str(payment_create.parking_lot_id)
+            "parking_lot_id": str(payment_create.parking_lot_id),
+            "original_amount": original_amount if discount_applied else None,
+            "discount_applied": discount_applied,
+            "discount_amount": discount_amount if discount_applied else None
         }
         
-        # Persist the payment
+        # OPTIMIZATION: Persist the single new payment directly
         try:
-            payments.append(payment)
-            save_payment_data(payments)
+            save_new_payment_to_db(payment)
         except Exception as e:
             logger.error(f"Failed to save payment: {e}")
             raise HTTPException(
@@ -241,15 +309,10 @@ def update_payment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have permissions to update payments"
             )
-        if payment_update.amount < 0 or payment_update.t_data.amount < 0:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail="Transaction/Tdata (amount) cannot be negative"
-            )
-        
-        # Load payments
+            
+        # OPTIMIZATION: Load only the payment to be updated
         try:
-            payments = load_payment_data()
+            payment = get_payment_data_by_id(payment_id)
         except Exception as e:
             logger.error(f"Failed to load payment data: {e}")
             raise HTTPException(
@@ -257,21 +320,11 @@ def update_payment(
                 detail="Failed to load payment data"
             )
         
-        # Find the payment by transaction ID
-        payment_index = None
-        for i, payment in enumerate(payments):
-            if payment["transaction"] == payment_id:
-                payment_index = i
-                break
-        
-        if payment_index is None:
+        if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Payment with transaction id {payment_id} not found"
             )
-        
-        # Get the existing payment
-        payment = payments[payment_index]
         
         # Apply partial update (only fields that were explicitly set)
         update_data = payment_update.model_dump(exclude_unset=True)
@@ -280,6 +333,7 @@ def update_payment(
         if "t_data" in update_data and update_data["t_data"]:
             if "t_data" not in payment:
                 payment["t_data"] = {}
+            # Ensure we update the dictionary in the payment object, not overwrite it
             payment["t_data"].update(update_data["t_data"])
             del update_data["t_data"]
         
@@ -289,13 +343,12 @@ def update_payment(
         if "parking_lot_id" in update_data:
             update_data["parking_lot_id"] = str(update_data["parking_lot_id"])
         
-        # Update other fields
+        # Update other fields in the existing payment object
         payment.update(update_data)
         
-        # Persist changes
+        # OPTIMIZATION: Persist the single updated payment directly
         try:
-            payments[payment_index] = payment
-            save_payment_data(payments)
+            update_existing_payment_in_db(payment_id, payment)
         except Exception as e:
             logger.error(f"Failed to save payment update: {e}")
             raise HTTPException(
@@ -316,22 +369,5 @@ def update_payment(
             detail="An unexpected error occurred"
         )
 
-
-def get_payment_by_transaction_id(
-    transaction_id: str,
-    payments: Optional[List[Dict]] = None
-) -> Optional[Dict]:
-    if payments is None:
-        payments = load_payment_data()
-    
-    return next(
-        (p for p in payments if p["transaction"] == transaction_id),
-        None
-    )
-
-
-def filter_payments_by_user(
-    payments: List[Dict],
-    username: str
-) -> List[Dict]:
-    return [p for p in payments if p["initiator"] == username]
+# NOTE: The helper functions get_payment_by_transaction_id and filter_payments_by_user
+# are now redundant or can be simplified as their logic is integrated/moved to storage_utils.

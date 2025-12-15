@@ -10,6 +10,7 @@ class RegisterRequest(BaseModel):
     username: str
     name:str
     password: str
+    role: Optional[str] = "USER"
     
 class User(BaseModel):
     id: str = Field(default="")

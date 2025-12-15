@@ -4,15 +4,12 @@ from datetime import datetime
 
 
 class VehicleCreate(BaseModel):
-    name: str = Field(..., min_length=1, strip_whitespace=True)
+    user_id: str
     license_plate: str = Field(..., min_length=6, max_length=8)
-
-    @field_validator("name")
-    @classmethod
-    def name_cannot_be_blank(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Name cannot be blank or whitespace")
-        return v.strip()
+    make: str
+    model: str
+    color: str
+    year: int
 
     @field_validator("license_plate")
     @classmethod
@@ -38,7 +35,12 @@ class VehicleCreate(BaseModel):
 
 
 class VehicleOut(BaseModel):
+    id: str
+    user_id: str
     license_plate: str
-    name: str
+    make: str
+    model: str
+    color: str
+    year: int
     created_at: datetime
-    updated_at: datetime
+    # updated_at: datetime

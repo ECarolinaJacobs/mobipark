@@ -2,6 +2,7 @@ import pytest
 import requests
 from datetime import datetime
 import uuid
+from urllib.parse import quote  # <--- NEW IMPORT
 
 BASE_URL = "http://localhost:8000/"
 
@@ -303,12 +304,13 @@ class TestGetPayments:
     
     def test_get_all_payments_as_admin(self, admin_headers, user_headers, sample_payment_data):
         """Test admin can see all payments from all users"""
-        # Create payment as regular user
+        # Create a payment as a regular user, separate from any fixtures
         user_payment = requests.post(
             url=f"{BASE_URL}payments",
             json=sample_payment_data,
             headers=user_headers
         )
+        assert user_payment.status_code == 201
         user_txn = user_payment.json()["transaction"]
         
         # Admin gets all payments
@@ -323,7 +325,7 @@ class TestGetPayments:
         # Admin should see payments from different users
         assert len(payments) > 0
         
-        # Verify admin can see the user's payment
+        # Verify admin can see the specific user's payment
         all_txns = [p["transaction"] for p in payments]
         assert user_txn in all_txns
     
@@ -331,8 +333,9 @@ class TestGetPayments:
         """Test user can get their own payment by ID"""
         transaction_id = created_payment["transaction"]
         
+        # FIX: URL-encode the transaction_id
         res = requests.get(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             headers=user_headers
         )
         
@@ -346,8 +349,9 @@ class TestGetPayments:
         """Test admin can get any payment by ID"""
         transaction_id = created_payment["transaction"]
         
+        # FIX: URL-encode the transaction_id
         res = requests.get(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             headers=admin_headers
         )
         
@@ -359,8 +363,9 @@ class TestGetPayments:
         """Test user cannot get another user's payment"""
         transaction_id = admin_payment["transaction"]
         
+        # FIX: URL-encode the transaction_id
         res = requests.get(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             headers=user_headers
         )
         
@@ -385,8 +390,9 @@ class TestGetPayments:
         """Test getting specific payment without auth fails"""
         transaction_id = created_payment["transaction"]
         
+        # FIX: URL-encode the transaction_id
         res = requests.get(
-            url=f"{BASE_URL}payments/{transaction_id}"
+            url=f"{BASE_URL}payments/{quote(transaction_id)}"
         )
         
         assert res.status_code == 401
@@ -413,8 +419,9 @@ class TestPutPayments:
             }
         }
         
+        # FIX: URL-encode the transaction_id
         res = requests.put(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             json=update_data,
             headers=admin_headers
         )
@@ -431,8 +438,9 @@ class TestPutPayments:
         
         update_data = {"amount": 150.00}
         
+        # FIX: URL-encode the transaction_id
         res = requests.put(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             json=update_data,
             headers=user_headers
         )
@@ -467,8 +475,9 @@ class TestPutPayments:
             }
         }
         
+        # FIX: URL-encode the transaction_id
         res = requests.put(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             json=update_data,
             headers=admin_headers
         )
@@ -481,8 +490,9 @@ class TestPutPayments:
         
         update_data = {"amount": 150.00}
         
+        # FIX: URL-encode the transaction_id
         res = requests.put(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             json=update_data
         )
         
@@ -503,8 +513,9 @@ class TestPutPayments:
             }
         }
         
+        # FIX: URL-encode the transaction_id
         res = requests.put(
-            url=f"{BASE_URL}payments/{transaction_id}",
+            url=f"{BASE_URL}payments/{quote(transaction_id)}",
             json=update_data,
             headers=admin_headers
         )
