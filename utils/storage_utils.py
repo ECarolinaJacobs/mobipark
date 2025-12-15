@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
-MOCK_PARKING_LOTS = Path(__file__).parent.parent / "mock_data/mock_parking-lots.json"
-MOCK_USERS = Path(__file__).parent.parent / "mock_data/mock_users.json"
+MOCK_PARKING_LOTS = (Path(__file__).parent.parent / "mock_data/mock_parking-lots.json").resolve()
+MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolve()
 
 # Define the database path globally
 DB_PATH = Path(__file__).parent / "../data/mobypark.db"
@@ -423,7 +423,7 @@ def write_text(filename, data):
 
 
 def save_data(filename, data):
-    if filename.endswith(".json"):
+    if str(filename).endswith(".json"):
         write_json(filename, data)
     elif filename.endswith(".csv"):
         write_csv(filename, data)
@@ -434,7 +434,7 @@ def save_data(filename, data):
 
 
 def load_data(filename):
-    if filename.endswith(".json"):
+    if str(filename).endswith(".json"):
         return load_json(filename)
     elif filename.endswith(".csv"):
         return load_csv(filename)

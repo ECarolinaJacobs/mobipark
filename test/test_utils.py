@@ -7,8 +7,8 @@ from dotenv import find_dotenv
 
 find_dotenv()
 use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
-MOCK_PARKING_LOTS = Path(__file__).parent.parent / "mock_data/mock_parking-lots.json"
-MOCK_USERS = Path(__file__).parent.parent / "mock_data/mock_users.json"
+MOCK_PARKING_LOTS = (Path(__file__).parent.parent / "mock_data/mock_parking-lots.json").resolve()
+MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolve()
 
 url = "http://localhost:8000/"
 
