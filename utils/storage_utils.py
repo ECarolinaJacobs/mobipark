@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
+MOCK_PARKING_LOTS = Path(__file__).parent.parent / "mock_data/mock_parking-lots.json"
+MOCK_USERS = Path(__file__).parent.parent / "mock_data/mock_users.json"
 
 # Define the database path globally
 DB_PATH = Path(__file__).parent / "../data/mobypark.db"
@@ -447,25 +449,25 @@ def load_data(filename):
 
 def load_user_data():
     if use_mock_data:
-        return load_data("mock_data/mock_users.json")
+        return load_data(MOCK_USERS)
     return load_data("data/users.json")
 
 
 def save_user_data(data):
     if use_mock_data:
-        save_data("mock_data/mock_users.json", data)
+        save_data(MOCK_USERS, data)
     save_data("data/users.json", data)
 
 
 def load_parking_lot_data():
     if use_mock_data:
-        return load_data("mock_data/mock_parking-lots.json")
+        return load_data(MOCK_PARKING_LOTS)
     return load_data("data/parking-lots.json")
 
 
 def save_parking_lot_data(data):
     if use_mock_data:
-        save_data("mock_data/mock_parking-lots.json", data)
+        save_data(MOCK_PARKING_LOTS, data)
     save_data("data/parking-lots.json", data)
 
 

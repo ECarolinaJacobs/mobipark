@@ -8,7 +8,7 @@ use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 
 USERS_FILE = Path("data/users.json")
 if use_mock_data:
-    USERS_FILE = Path("../mock_data/mock_users.json")
+    USERS_FILE = Path(__file__).parent.parent / "mock_data/mock_users.json"
 
 with open(USERS_FILE, "r", encoding="utf-8") as f:
     users = json.load(f)
