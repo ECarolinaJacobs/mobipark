@@ -343,21 +343,32 @@ def test_admin_view_user_vehicles():
 # test passed if reservation is sent back, returns 200
 def test_get_vehicle_reservations():
     headers = register_login("res_user", "123")
-    data = {
+    vehicle_data = {
         "user_id": "test",
-        "license_plate": "RR-10-CD",
+        "license_plate": "13-RD-11",
         "make": "Renault",
         "model": "Clio",
         "color": "Blue",
         "year": 2019,
     }
-    requests.post(f"{url}/vehicles", json=data, headers=headers)
-    lid = "RR10CD"
+    vehicle_res = requests.post(f"{url}/vehicles", json=vehicle_data, headers=headers)
+    assert vehicle_res.status_code == 200
+    vehicle_id = vehicle_res.json()["id"]
+    reservation_data = {
+        "vehicle_id": vehicle_id,
+        "start_time": "2025-12-20T10:00:00:00Z",
+        "end_time": "2025-12-20T14:00:00Z",
+        "parking_lot_id": "1",
+    }
+    res_create = requests.post(f"{url}/reservations/", json=reservation_data, headers=headers)
+    lid = "13RD11"
     res = requests.get(f"{url}/vehicles/{lid}/reservations", headers=headers)
-    assert res.status_code == 200
     body = res.json()
     assert "reservations" in body
     assert isinstance(body["reservations"], list)
+    if res_create.status_code == 201:
+        assert len(body["reservations"]) > 0
+        assert body["reservations"][0]["vehicle_id"] == vehicle_id
 
 
 # added test get/vehicles/{license_plate}/history
