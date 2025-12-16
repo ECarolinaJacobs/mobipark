@@ -1,6 +1,6 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-name: Python package
+name: CI - Python package
 on:
   push:
     branches: [ "main" ]
@@ -20,9 +20,9 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      run: |
+      run: |  
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest fastapi[standard] requests
+        python -m pip install flake8 pytest coverage fastapi[standard] requests
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
@@ -34,6 +34,26 @@ jobs:
       run: |
         fastapi dev main.py &
         sleep 5
-    - name: Test with pytest
+    - name: Run tests with coverage
       run: |
-        pytest
+        coverage run -m pytest -v
+        coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+        coverage xml
+        coverage html
+        coverage report --fail-under=80
+    
+    - name: Store coverage HTML report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-html-report
+        path: htmlcov/
+      if: always()
+    
+    - name: Store coverage XML report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-xml-report
+        path: coverage.xml
+      if: always()
+
+      
