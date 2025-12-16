@@ -22,18 +22,18 @@ class ParkingLot(BaseModel):
     coordinates: Coordinates
 
 class UpdateParkingLot(BaseModel):
-    name: Optional[str] = None
-    location: Optional[str] = None
-    address: Optional[str] = None
-    capacity: Optional[int] = None
-    reserved: Optional[int] = None
-    tariff: Optional[float] = None
-    daytariff: Optional[float] = None
-    created_at: Optional[str] = None
+    name: Optional[str] = Field(min_length=1)
+    location: Optional[str] = Field(min_length=1)
+    address: Optional[str] = Field(min_length=1)
+    capacity: Optional[int] = Field(ge=0)
+    reserved: Optional[int] = Field(ge=0)
+    tariff: Optional[float] = Field(ge=0)
+    daytariff: Optional[float] = Field(ge=0)
+    created_at: Optional[str] = Field(default=datetime.now().isoformat())
     coordinates: Optional[Coordinates] = None
 
 class ParkingSessionCreate(BaseModel):
-    licenseplate: str
+    licenseplate: str = Field(min_length=1)
 
 class UpdateParkingSessionOngoing(BaseModel):
     licenseplate: Optional[str] = None
