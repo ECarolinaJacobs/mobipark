@@ -10,7 +10,11 @@ load_dotenv()
 use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 
 # Define the database path globally
-DB_PATH = Path(__file__).parent / "../data/mobypark.db"
+# Check for test database path first (for pytest)
+if os.getenv("TEST_DB_PATH"):
+    DB_PATH = Path(os.getenv("TEST_DB_PATH"))
+else:
+    DB_PATH = Path(__file__).parent / "../data/mobypark.db"
 
 
 # --- General Normalization/Unnormalization Functions (RETAINED) ---
@@ -362,7 +366,10 @@ def get_refunds_by_transaction_id(transaction_id: str) -> List[Dict]:
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT data FROM refunds WHERE json_extract(data, '$.original_transaction_id') = ?", (transaction_id,))
+            cursor.execute(
+                "SELECT data FROM refunds WHERE json_extract(data, '$.original_transaction_id') = ?",
+                (transaction_id,),
+            )
             rows = cursor.fetchall()
             return [json.loads(row[0]) for row in rows]
     except Exception:

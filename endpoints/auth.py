@@ -109,7 +109,12 @@ def register_hotel_manager(hotel_manager_data: HotelManagerCreate, authorization
     from utils.storage_utils import load_parking_lot_data
 
     parking_lots = load_parking_lot_data()
-    if hotel_manager_data.parking_lot_id not in parking_lots:
+    if isinstance(parking_lots, dict):
+        lot_exists = hotel_manager_data.parking_lot_id in parking_lots
+    else:
+        lot_exists = any(lot.get("id") == hotel_manager_data.parking_lot_id for lot in parking_lots)
+
+    if not lot_exists:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Parking lot with Id {hotel_manager_data.parking_lot_id} not found",

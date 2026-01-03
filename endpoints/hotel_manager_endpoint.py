@@ -38,7 +38,7 @@ def require_hotel_manager(request: Request) -> Dict[str, str]:
     """Hotel manager authentication dependency"""
     session_user = require_auth(request)
     if session_user["role"] != ROLE_HOTEL_MANAGER:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hotel manager priviliges required")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hotel manager privileges required")
     if not session_user.get("managed_parking_lot_id"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="No parking lot assigned to this hotel manager"
@@ -71,11 +71,16 @@ def create_hotel_discount_code(
     try:
         parking_lots = load_parking_lot_data()
         managed_lot_id = session_user["managed_parking_lot_id"]
-        if managed_lot_id not in parking_lots:
+        if isinstance(parking_lots, dict):
+            lot_exists = managed_lot_id in parking_lots
+        else:
+            lot_exists = any(lot.get("id") == managed_lot_id for lot in parking_lots)
+        if not lot_exists:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Managed parking lot {managed_lot_id} not found",
             )
+
         existing_discount = get_discount_by_code(discount_create.code)
         if existing_discount:
             raise HTTPException(
@@ -98,7 +103,7 @@ def create_hotel_discount_code(
             "created_by": session_user["username"],
             "guest_name": discount_create.guest_name,
             "notes": discount_create.notes,
-            "is_hotel_code": True,
+            "is_hotel_code": 1,
         }
         # save the discount code
         try:
@@ -135,7 +140,7 @@ def get_hotel_discount_codes(session_user: Dict[str, str] = Depends(require_hote
         hotel_codes = [
             code
             for code in all_discount_codes
-            if code.get("created_by") == session_user["username"] and code.get("is_hotel_code") is True
+            if code.get("created_by") == session_user["username"] and code.get("is_hotel_code")
         ]
         return JSONResponse(content=hotel_codes, status_code=status.HTTP_200_OK)
     except Exception as e:
@@ -225,14 +230,22 @@ def get_managed_parking_lot(session_user: Dict[str, str] = Depends(require_hotel
     try:
         parking_lots = load_parking_lot_data()
         managed_lot_id = session_user["managed_parking_lot_id"]
-        if managed_lot_id not in parking_lots:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Managed parking lot {managed_lot_id} not found",
-            )
+        if isinstance(parking_lots, dict):
+            if managed_lot_id not in parking_lots:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Managed parking lot {managed_lot_id} not found",
+                )
 
-        parking_lot = parking_lots[managed_lot_id]
-        parking_lot["id"] = managed_lot_id
+            parking_lot = parking_lots[managed_lot_id]
+            parking_lot["id"] = managed_lot_id
+        else:
+            parking_lot = next((lot for lot in parking_lots if lot.get("id") == managed_lot_id), None)
+            if not parking_lot:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Managed parking lot {managed_lot_id} not found",
+                )
         return JSONResponse(content=parking_lot, status_code=status.HTTP_200_OK)
     except HTTPException:
         raise

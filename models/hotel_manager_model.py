@@ -9,7 +9,7 @@ class HotelManagerCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     name: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=6)
-    parking_lot: str = Field(..., description="Id of the parking lot this hotel manager will manage")
+    parking_lot_id: str = Field(..., description="Id of the parking lot this hotel manager will manage")
     email: Optional[str] = None
     phone: Optional[str] = None
 
@@ -49,9 +49,3 @@ class HotelDiscountCode(BaseModel):
     guest_name: Optional[str] = None
     notes: Optional[str] = None
     is_hotel_code: bool = True  # flag to distinguis hotel from admin discount codes
-
-    parking_lot_id: str  # Which parking lot this code is valid for
-    created_by: str  # Hotel manager username who created it
-    guest_name: Optional[str] = None
-    notes: Optional[str] = None
-    is_hotel_code: bool = True  # Flag to distinguish from admin discount codes
