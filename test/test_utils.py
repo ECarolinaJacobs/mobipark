@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+import random
 from utils import storage_utils
 from dotenv import find_dotenv
 
@@ -71,16 +72,27 @@ def find_parking_lot_id_by_name():
         if v.get("name") == "TEST_PARKING_LOT":
             return k
         
-def find_parking_session_id_by_plate(parking_lot_id: str):
+def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str):
     filename = f"../data/pdata/p{parking_lot_id}-sessions.json"
     with open(filename, "r") as f:
         parking_lots = json.load(f)
 
     for k, v in parking_lots.items():
-        if v.get("licenseplate") == "TEST-PLATE":
+        if v.get("licenseplate") == licenseplate:
             return k
 
 def get_session(username="test", password="test"):
     res = requests.post(f"{url}/login", json={"username": username, "password": password})
     ses_token = res.json()["session_token"]
     return {"Authorization": ses_token}
+
+def create_random_dutch_plate():
+    patterns = [
+        lambda: f"{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.randint(10, 99)}-{random.randint(10, 99)}", 
+        lambda: f"{random.randint(10, 99)}-{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.randint(10, 99)}",  
+        lambda: f"{random.randint(10, 99)}-{random.randint(10, 99)}-{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}",
+        lambda: f"{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.randint(10, 99)}-{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}",
+        lambda: f"{random.randint(10, 99)}-{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}",
+        lambda: f"{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.randint(10, 99)}",
+    ]
+    return random.choice(patterns)()

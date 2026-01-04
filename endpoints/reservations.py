@@ -5,7 +5,7 @@ from models.reservations_model import CreateReservation, UpdateReservation
 import logging
 from utils.storage_utils import load_reservation_data, save_reservation_data, load_parking_lot_data, save_parking_lot_data
 from utils.session_manager import get_session
-from datetime import datetime, timezone
+from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
@@ -82,6 +82,12 @@ def create_reservation(reservation_data: CreateReservation, session_user: Dict[s
     if reservation_data.parking_lot_id not in parking_lots:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parking lot not found")
 
+    #Can't be implemented yet because the parking lot exceeds the capacity in the data, so it will give errors
+    # if parking_lots[parking_lot_id]["reserved"] == parking_lots[parking_lot_id]["capacity"]:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_409_CONFLICT,
+    #         detail="Parking lot is full, please try again tomorrow"
+    #     )
 
     if session_user.get("role") == ADMIN:
         if not reservation_data.user_id:
@@ -93,7 +99,7 @@ def create_reservation(reservation_data: CreateReservation, session_user: Dict[s
     
     reservation_data_dict = reservation_data.model_dump()
     reservation_data_dict["id"] = rid
-    reservation_data_dict["created_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat(timespec='seconds').replace('+00:00', 'Z')
+    reservation_data_dict["created_at"] = datetime.now().replace(microsecond=0).isoformat(timespec='minutes').replace('+00:00', '')
 
     reservations.append(reservation_data_dict)
     

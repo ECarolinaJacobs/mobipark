@@ -1,16 +1,16 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import re
 import uuid
 
-ISO_REGEX = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"
+ISO_REGEX = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$"
 
 class CreateReservation(BaseModel):
     user_id: Optional[str] = None 
     vehicle_id: str
     start_time: str
-    end_time: str
+    end_time: str = ""
     parking_lot_id: str
     status: str = "pending"
     created_at: Optional[str] = None
@@ -23,12 +23,12 @@ class CreateReservation(BaseModel):
             raise ValueError("Vehicle id must be a valid uuid") 
         return str(value)
 
-    @field_validator('start_time', 'end_time')
+    @field_validator('start_time')
     def validate_iso_datetime(cls, value):
         if not re.match(ISO_REGEX, value):
-            raise ValueError("Date must be in iso format: YYYY-MM-DDTHH:MM:SSZ")
+            raise ValueError("Date must be in iso format: YYYY-MM-DDTHH:MM")
         try:
-            datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+            datetime.strptime(value, "%Y-%m-%dT%H:%M")
         except ValueError:
             raise ValueError("Invalid iso datetime")
         return value
@@ -45,7 +45,6 @@ class UpdateReservation(BaseModel):
     user_id: Optional[str] = None
     vehicle_id: str
     start_time: str
-    end_time: str
     parking_lot_id: str
     status : Optional[str] = None
     cost: Optional[float] = None
@@ -58,16 +57,15 @@ class UpdateReservation(BaseModel):
             raise ValueError("Vehicle id must be a valid uuid") 
         return str(value)
 
-    @field_validator('start_time', 'end_time')
-    def validate_iso_datetime(cls, value):
+    @field_validator('start_time')
+    def validate_iso_start_time(cls, value):
         if not re.match(ISO_REGEX, value):
-            raise ValueError("Date must be in iso format: YYYY-MM-DDTHH:MM:SSZ")
+            raise ValueError("Date must be in iso format: YYYY-MM-DDTHH:MM")
         try:
-            datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+            datetime.strptime(value, "%Y-%m-%dT%H:%M")
         except ValueError:
             raise ValueError("Invalid iso datetime")
         return value
-
     @field_validator('parking_lot_id')
     def validate_parking_lot_id(cls, value):
         if not value.isdigit():
