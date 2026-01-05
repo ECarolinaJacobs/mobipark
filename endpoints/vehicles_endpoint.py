@@ -8,12 +8,10 @@ from utils.storage_utils import (
     get_vehicle_data_by_user,
     update_existing_vehicle_in_db,
     delete_vehicle_from_db,
-    get_user_data_by_username_for_vehicles,
     load_vehicle_data_from_db,
     save_vehicle_data_to_db,
+    load_reservation_data_from_db,
 )
-
-
 from utils.session_manager import get_session
 
 
@@ -134,7 +132,6 @@ def get_vehicle_reservations(license_plate: str, authorization: Optional[str] = 
     if not token or not get_session(token):
         raise HTTPException(status_code=401, detail="Unauthorized")
     session_user = get_session(token)
-    # find target vehicle
     target_vehicle = find_vehicle_by_license_plate(license_plate)
     if (
         target_vehicle["user_id"] != str(session_user["username"])
@@ -143,8 +140,17 @@ def get_vehicle_reservations(license_plate: str, authorization: Optional[str] = 
         raise HTTPException(
             status_code=403, detail="Forbidden: cannot access another users vehicle reservations"
         )
-    # placeholder until reservations integration
-    return {"reservations": []}
+    try:
+        all_reservations = load_reservation_data_from_db()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error loading reservation data")
+
+    vehicle_reservations = [
+        reservation
+        for reservation in all_reservations
+        if reservation.get("vehicle_id") == target_vehicle["id"]
+    ]
+    return {"reservations": vehicle_reservations}
 
 
 @router.get("/vehicles/{license_plate}/history")
@@ -158,5 +164,29 @@ def get_vehicle_history(license_plate: str, authorization: Optional[str] = Heade
         target_vehicle["user_id"] != str(session_user["username"])
         and session_user.get("role", "").upper() != "ADMIN"
     ):
-        raise HTTPException(status_code=403, detail="Forbidden: cannot access another users vehicle history")
-    return {"history": []}
+        raise HTTPException(status_code=403, detail="Forbidden, cannot access another users vehicle history")
+    from utils.storage_utils import load_parking_lot_data, load_parking_session_data
+
+    parking_lots = load_parking_lot_data()
+    completed_sessions = []
+    normalized_plate = normalize_plate(license_plate)
+    for lot_id, lot_data in parking_lots.items():
+        try:
+            sessions = load_parking_session_data(lot_id)
+            for session_id, session_data in sessions.items():
+                if (
+                    normalize_plate(session_data.get("licenseplate", "")) == normalized_plate
+                    and session_data.get("stopped") is not None
+                ):
+                    session_with_context = {
+                        "session_id": session_id,
+                        "parking_lot_id": lot_id,
+                        "parking_lot_name": lot_data.get("name"),
+                        "parking_lot_address": lot_data.get("address"),
+                        **session_data,
+                    }
+                    completed_sessions.append(session_with_context)
+        except FileNotFoundError:
+            continue
+    completed_sessions.sort(key=lambda x: x.get("stopped", ""), reverse=True)
+    return {"history": completed_sessions}
