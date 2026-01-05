@@ -1,9 +1,10 @@
+import csv
 import json
 import os
-import csv
 import sqlite3
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,6 +12,140 @@ use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 
 # Define the database path globally
 DB_PATH = Path(__file__).parent / "../data/mobypark.db"
+
+
+def init_db():
+    """
+    Initializes the database and creates tables if they don't exist.
+    """
+    # Create the data directory if it doesn't exist
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        # Create users table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT,
+                username TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                name TEXT,
+                email TEXT,
+                phone_number TEXT,
+                role TEXT,
+                created_at TEXT,
+                birth_year INTEGER,
+                is_active INTEGER DEFAULT 1,
+                last_login TEXT,
+                hash_type TEXT
+            )
+        """)
+
+        # Create parking_lots table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS parking_lots (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                location TEXT,
+                address TEXT,
+                capacity INTEGER,
+                reserved INTEGER,
+                tariff REAL,
+                daytariff REAL,
+                created_at TEXT,
+                "coordinates.lat" REAL,
+                "coordinates.lng" REAL
+            )
+        """)
+
+        # Create reservations table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reservations (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                vehicle_id TEXT,
+                parking_lot_id TEXT,
+                start_time TEXT,
+                end_time TEXT,
+                cost REAL,
+                status TEXT,
+                created_at TEXT
+            )
+        """)
+
+        # Create payments table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+                "transaction" TEXT PRIMARY KEY,
+                amount REAL,
+                initiator TEXT,
+                created_at TEXT,
+                completed TEXT,
+                hash TEXT,
+                session_id TEXT,
+                parking_lot_id TEXT,
+                original_amount REAL,
+                discount_applied TEXT,
+                discount_amount REAL,
+                "t_data.amount" REAL,
+                "t_data.date" TEXT,
+                "t_data.method" TEXT,
+                "t_data.issuer" TEXT,
+                "t_data.bank" TEXT
+            )
+        """)
+
+        # Create discounts table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS discounts (
+                code TEXT PRIMARY KEY,
+                discount_type TEXT,
+                discount_value REAL,
+                max_uses INTEGER,
+                current_uses INTEGER,
+                active INTEGER,
+                created_at TEXT,
+                expires_at TEXT
+            )
+        """)
+
+        # Create refunds table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS refunds (
+                refund_id TEXT PRIMARY KEY,
+                original_transaction_id TEXT,
+                amount REAL,
+                reason TEXT,
+                status TEXT,
+                created_at TEXT,
+                processed_by TEXT,
+                refund_hash TEXT
+            )
+        """)
+
+        # Create vehicles table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS vehicles (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            license_plate TEXT NOT NULL,
+            make TEXT,
+            model TEXT,
+            color TEXT,
+            year INTEGER,
+            is_default INTEGER DEFAULT 0,
+            created_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (username)
+        )
+    """)
+
+        conn.commit()
+        print("Database Created")
+
+
+# Call the init function at the start of the script
+init_db()
 
 
 # --- General Normalization/Unnormalization Functions (RETAINED) ---
@@ -74,7 +209,11 @@ def unnormalize_data(data: List[Dict]) -> List[Dict]:
         # 3. Merge the reconstructed nested parts into the final dictionary
         for k, v in temp_nested_parts.items():
             # If the key already exists (from a base column) and is a dictionary, merge; otherwise overwrite.
-            if k in final_unflat_dict and isinstance(final_unflat_dict[k], dict) and isinstance(v, dict):
+            if (
+                k in final_unflat_dict
+                and isinstance(final_unflat_dict[k], dict)
+                and isinstance(v, dict)
+            ):
                 final_unflat_dict[k].update(v)
             else:
                 final_unflat_dict[k] = v
@@ -127,7 +266,9 @@ def load_json_from_db(table_name: str) -> List[Dict]:
     return unnormalize_data(normalized_data)
 
 
-def load_single_json_from_db(table_name: str, key_col: str, key_val: str) -> Optional[Dict]:
+def load_single_json_from_db(
+    table_name: str, key_col: str, key_val: str
+) -> Optional[Dict]:
     """
     Loads a single row using a WHERE clause.
     """
@@ -168,7 +309,9 @@ def insert_single_json_to_db(table_name: str, item: Dict):
     # 3. Construct SQL statement
     column_names_sql = ", ".join([f'"{col}"' for col in insert_columns])
     placeholders_sql = ", ".join(["?"] * len(insert_columns))
-    sql_insert = f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
+    sql_insert = (
+        f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
+    )
 
     try:
         with sqlite3.connect(DB_PATH) as conn:
@@ -179,7 +322,9 @@ def insert_single_json_to_db(table_name: str, item: Dict):
         raise
 
 
-def update_single_json_in_db(table_name: str, key_col: str, key_val: str, update_item: Dict):
+def update_single_json_in_db(
+    table_name: str, key_col: str, key_val: str, update_item: Dict
+):
     """
     Updates a single existing row in the table based on a key column.
     The update_item must contain the complete, final state of the object.
@@ -248,7 +393,9 @@ def save_json_to_db(table_name, data):
     column_names_sql = ", ".join([f'"{col}"' for col in insert_columns])
     placeholders_sql = ", ".join(["?"] * len(insert_columns))
 
-    sql_insert = f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
+    sql_insert = (
+        f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
+    )
     sql_delete = f"DELETE FROM {table_name}"
 
     try:
@@ -303,7 +450,9 @@ def load_payment_data_from_db():
 
 
 def get_payment_data_by_id(payment_id: str) -> Optional[Dict]:
-    return load_single_json_from_db("payments", key_col="transaction", key_val=payment_id)
+    return load_single_json_from_db(
+        "payments", key_col="transaction", key_val=payment_id
+    )
 
 
 def save_new_payment_to_db(payment_data: Dict):
@@ -311,7 +460,9 @@ def save_new_payment_to_db(payment_data: Dict):
 
 
 def update_existing_payment_in_db(payment_id: str, payment_data: Dict):
-    update_single_json_in_db("payments", key_col="transaction", key_val=payment_id, update_item=payment_data)
+    update_single_json_in_db(
+        "payments", key_col="transaction", key_val=payment_id, update_item=payment_data
+    )
 
 
 # DEPRECATED/REMOVED: save_payment_data_to_db (Use save_new_payment_to_db or update_existing_payment_in_db)
@@ -333,7 +484,9 @@ def save_new_discount_to_db(discount_data: Dict):
 
 
 def update_existing_discount_in_db(discount_code: str, discount_data: Dict):
-    update_single_json_in_db("discounts", key_col="code", key_val=discount_code, update_item=discount_data)
+    update_single_json_in_db(
+        "discounts", key_col="code", key_val=discount_code, update_item=discount_data
+    )
 
 
 def save_discounts_data_to_db(data):
@@ -354,7 +507,9 @@ def save_new_refund_to_db(refund_data: Dict):
 
 
 def update_existing_refund_in_db(refund_id: str, refund_data: Dict):
-    update_single_json_in_db("refunds", key_col="refund_id", key_val=refund_id, update_item=refund_data)
+    update_single_json_in_db(
+        "refunds", key_col="refund_id", key_val=refund_id, update_item=refund_data
+    )
 
 
 def get_refunds_by_transaction_id(transaction_id: str) -> List[Dict]:
@@ -362,7 +517,10 @@ def get_refunds_by_transaction_id(transaction_id: str) -> List[Dict]:
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT data FROM refunds WHERE json_extract(data, '$.original_transaction_id') = ?", (transaction_id,))
+            cursor.execute(
+                "SELECT data FROM refunds WHERE json_extract(data, '$.original_transaction_id') = ?",
+                (transaction_id,),
+            )
             rows = cursor.fetchall()
             return [json.loads(row[0]) for row in rows]
     except Exception:
@@ -522,7 +680,8 @@ def get_vehicle_data_by_id(vehicle_id: str):
         # allow lookup by 'id' or 'license_plate' key
         if (
             vehicle.get("id") == vehicle_id
-            or vehicle.get("license_plate", "").replace("-", "").upper() == vehicle_id.upper()
+            or vehicle.get("license_plate", "").replace("-", "").upper()
+            == vehicle_id.upper()
         ):
             return vehicle
     return None

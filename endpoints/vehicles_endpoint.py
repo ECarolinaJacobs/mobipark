@@ -10,9 +10,8 @@ from utils.storage_utils import (
     delete_vehicle_from_db,
     load_vehicle_data_from_db,
     save_vehicle_data_to_db,
+    load_reservation_data_from_db,
 )
-
-
 from utils.session_manager import get_session
 
 
@@ -133,7 +132,6 @@ def get_vehicle_reservations(license_plate: str, authorization: Optional[str] = 
     if not token or not get_session(token):
         raise HTTPException(status_code=401, detail="Unauthorized")
     session_user = get_session(token)
-    # find target vehicle
     target_vehicle = find_vehicle_by_license_plate(license_plate)
     if (
         target_vehicle["user_id"] != str(session_user["username"])
@@ -142,8 +140,17 @@ def get_vehicle_reservations(license_plate: str, authorization: Optional[str] = 
         raise HTTPException(
             status_code=403, detail="Forbidden: cannot access another users vehicle reservations"
         )
-    # placeholder until reservations integration
-    return {"reservations": []}
+    try:
+        all_reservations = load_reservation_data_from_db()
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error loading reservation data")
+
+    vehicle_reservations = [
+        reservation
+        for reservation in all_reservations
+        if reservation.get("vehicle_id") == target_vehicle["id"]
+    ]
+    return {"reservations": vehicle_reservations}
 
 
 @router.get("/vehicles/{license_plate}/history")
