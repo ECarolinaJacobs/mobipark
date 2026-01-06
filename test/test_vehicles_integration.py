@@ -3,6 +3,8 @@ import pytest
 import time
 import random
 import string
+from datetime import datetime, timedelta
+from test.test_utils import create_user
 
 url = "http://localhost:8000/"
 
@@ -31,11 +33,8 @@ def register_login(username="vehicle_user", password="123", name=None, role="USE
 
 
 def register_admin(username="admin_user", password="123", name="Admin"):
-    name = name or username
-    register_data = {"username": username, "password": password, "name": name}
-    res = requests.post(f"{url}/auth/register", json=register_data)
-    if res.status_code == 400 and "Username already exists" in res.text:
-        res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
+    create_user(True, username, password)
+    res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
     assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
     token = res.json().get("session_token")
     assert token, f"No token received from auth response: {res.text}"
@@ -298,7 +297,8 @@ def test_get_list():
     }
 
     # create a vehicle
-    requests.post(f"{url}/vehicles", json=data, headers=headers)
+    res_post = requests.post(f"{url}/vehicles", json=data, headers=headers)
+    assert res_post.status_code in (200, 400)
 
     # retrieve the user's vehicle list
     res = requests.get(f"{url}/vehicles", headers=headers)
@@ -343,9 +343,10 @@ def test_admin_view_user_vehicles():
 # test passed if reservation is sent back, returns 200
 def test_get_vehicle_reservations():
     headers = register_login("res_user", "123")
+    plate = valid_plate()
     vehicle_data = {
         "user_id": "test",
-        "license_plate": "13-RD-11",
+        "license_plate": plate,
         "make": "Renault",
         "model": "Clio",
         "color": "Blue",
@@ -361,7 +362,7 @@ def test_get_vehicle_reservations():
         "parking_lot_id": "1",
     }
     res_create = requests.post(f"{url}/reservations/", json=reservation_data, headers=headers)
-    lid = "13RD11"
+    lid = plate.replace("-", "").upper()
     res = requests.get(f"{url}/vehicles/{lid}/reservations", headers=headers)
     body = res.json()
     assert "reservations" in body
@@ -392,6 +393,18 @@ def test_get_vehicle_history():
     lots = lots_res.json()
     assert len(lots) > 0, "No parking lots available for this test"
     lot_id = list(lots.keys())[0]
+
+    # create reservation
+    vehicle_id = create_vehicle_res.json()["id"]
+    reservation_data = {
+        "vehicle_id": vehicle_id,
+        "parking_lot_id": lot_id,
+        "start_time": datetime.now().strftime("%Y-%m-%dT%H:%M"),
+        "end_time": (datetime.now() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M")
+    }
+    reservation_res = requests.post(f"{url}/reservations/", json=reservation_data, headers=user_headers)
+    assert reservation_res.status_code in (200, 201)
+
     # start parking session
     session_data = {"licenseplate": vehicle_plate}
     start_res = requests.post(

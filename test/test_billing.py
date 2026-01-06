@@ -1,46 +1,23 @@
 import pytest
 import requests
-
+from test.test_utils import create_user
 
 url = "http://localhost:8000"
 
-#helper functions to get user&admin tokens
-def register_or_login_user(username="testuser", password="testpass", name=None):
-    name = name or username
-    register_data = {"username": username, "password": password, "name": name}
-    res = requests.post(f"{url}/auth/register", json=register_data)
-
-    if res.status_code == 400 and "Username already exists" in res.text:
-        login_data = {"username": username, "password": password}
-        res = requests.post(f"{url}/auth/login", json=login_data)
-
-    assert res.status_code in (200, 201), f"User auth failed: {res.text}"
-    token = res.json().get("session_token")
-    assert token, f"No session token returned: {res.text}"
-
-    return {"Authorization": token}
-
-def register_admin(username="admin_user", password="123", name="admin"):
-    name = name or username
-    register_data = {"username": username, "password": password, "name": name, "role": "ADMIN"}
-    res = requests.post(f"{url}/auth/register", json=register_data)
-    if res.status_code == 400 and "Username already exists" in res.text:
-        res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
-    assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
-    token = res.json().get("session_token")
-    assert token, f"No token received from auth response: {res.text}"
-    return {"Authorization": token}
-
+def login(username, password):
+    res = requests.post(f"{url}/login", json={"username": username, "password": password})
+    assert res.status_code == 200
+    return res.json()["session_token"]
 
 @pytest.fixture
 def user_token():
-    return register_or_login_user(username="testuser", password="testpass")["Authorization"]
-
+    create_user(False, "testuser", "testpass")
+    return login("testuser", "testpass")
 
 @pytest.fixture
 def admin_token():
-    return register_admin(username="admin", password="admin")["Authorization"]
-
+    create_user(True, "admin", "admin")
+    return login("admin", "admin")
 
 #this test Checks that the /billing endpoint requires authentication.
 def test_billing_unauthorized():

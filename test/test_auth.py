@@ -1,5 +1,6 @@
 import pytest
 import requests
+from test.test_utils import delete_user
 
 url = "http://localhost:8000"
 
@@ -15,6 +16,7 @@ def test_user():
 
 #tests if a new user can register successfully and receives a session token, and an Authorization header.
 def test_register_user(test_user):
+    delete_user(test_user["username"])
     res = requests.post(f"{url}/register", json=test_user)
     assert res.status_code == 200
     data = res.json()

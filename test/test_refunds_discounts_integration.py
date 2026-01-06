@@ -2,6 +2,7 @@ import pytest
 import requests
 from datetime import datetime, timedelta
 import uuid
+from test.test_utils import create_user
 
 BASE_URL = "http://localhost:8000/"
 
@@ -26,10 +27,12 @@ def login(role: str = "user"):
 
 @pytest.fixture
 def user_headers():
+    create_user(False, USER_LOGIN["username"], USER_LOGIN["password"])
     return login("user")
 
 @pytest.fixture
 def admin_headers():
+    create_user(True, ADMIN_LOGIN["username"], ADMIN_LOGIN["password"])
     return login("admin")
 
 @pytest.fixture

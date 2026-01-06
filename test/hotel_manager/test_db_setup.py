@@ -19,7 +19,14 @@ def test_db_fixture_creates_parking_lots(client):
     """verify test database has parking lots"""
     parking_lots = load_parking_lot_data_from_db()
     assert len(parking_lots) >= 2
-    lot_1 = next((lot for lot in parking_lots if lot.get("id") == "1"), None)
+    
+    # Handle dict (from DB) vs list (from Mock)
+    if isinstance(parking_lots, dict):
+        lots_list = list(parking_lots.values())
+    else:
+        lots_list = parking_lots
+        
+    lot_1 = next((lot for lot in lots_list if lot.get("id") == "1"), None)
     assert lot_1 is not None
     assert lot_1["name"] == "Hotel Royal Parking"
 

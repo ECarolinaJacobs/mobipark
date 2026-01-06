@@ -42,7 +42,7 @@ def vehicle_creation_succes():
     elif res.status_code == 400 and "already exists" in res.json().get("detail", ""):
         res_get = requests.get(f"{URL}/vehicles", headers=headers) 
         if res_get.status_code == 200 and res_get.json():
-             for v in res_get.json():
+             for v in res_get.json().get("vehicles", []):
                  if v.get('license_plate') == unique_plate:
                      vehicle = v
                      break
@@ -86,7 +86,7 @@ def vehicle_creation_succes_admin():
     elif res.status_code == 400 and "already exists" in res.json().get("detail", ""):
         res_get = requests.get(f"{URL}/vehicles", headers=headers)
         if res_get.status_code == 200 and res_get.json():
-            for v in res_get.json():
+            for v in res_get.json().get("vehicles", []):
                 if v.get('license_plate') == unique_plate:
                     vehicle = v
                     break

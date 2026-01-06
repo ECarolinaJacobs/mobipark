@@ -9,7 +9,7 @@ from utils.storage_utils import (
     update_existing_vehicle_in_db,
     delete_vehicle_from_db,
     load_vehicle_data_from_db,
-    save_vehicle_data_to_db,
+    save_new_vehicle_to_db,
     load_reservation_data_from_db,
 )
 from utils.session_manager import get_session
@@ -61,7 +61,7 @@ def create_vehicle(payload: VehicleCreate, authorization: Optional[str] = Header
         "created_at": datetime.now().isoformat(),
     }
     try:
-        save_vehicle_data_to_db(new_vehicle)
+        save_new_vehicle_to_db(new_vehicle)
     except Exception:
         raise HTTPException(status_code=400, detail="Vehicle already exists")
     return new_vehicle

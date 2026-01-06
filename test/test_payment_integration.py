@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 import uuid
 from urllib.parse import quote  # <--- NEW IMPORT
+from test.test_utils import create_user
 
 BASE_URL = "http://localhost:8000/"
 
@@ -34,12 +35,14 @@ def login(role: str = "user"):
 @pytest.fixture
 def user_headers():
     """Get authentication headers for regular user"""
+    create_user(False, USER_LOGIN["username"], USER_LOGIN["password"])
     return login("user")
 
 
 @pytest.fixture
 def admin_headers():
     """Get authentication headers for admin user"""
+    create_user(True, ADMIN_LOGIN["username"], ADMIN_LOGIN["password"])
     return login("admin")
 
 

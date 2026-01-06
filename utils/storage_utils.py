@@ -19,11 +19,15 @@ MOCK_REFUNDS = (Path(__file__).parent.parent / "mock_data/mock_refunds.json").re
 MOCK_VEHICLES = (Path(__file__).parent.parent / "mock_data/mock_vehicles.json").resolve()
 
 # Define the database path globally
-# Check for test database path first (for pytest)
-if os.getenv("TEST_DB_PATH"):
-    DB_PATH = Path(os.getenv("TEST_DB_PATH"))
-else:
-    DB_PATH = Path(__file__).parent / "../data/mobypark.db"
+def get_db_path():
+    # Check for test database path first (for pytest)
+    path = None
+    if os.getenv("TEST_DB_PATH"):
+        path = Path(os.getenv("TEST_DB_PATH"))
+    else:
+        path = Path(__file__).parent / "../data/mobypark.db"
+    print(f"DEBUG: get_db_path returning {path}")
+    return path
 
 
 def init_db():
@@ -31,9 +35,9 @@ def init_db():
     Initializes the database and creates tables if they don't exist.
     """
     # Create the data directory if it doesn't exist
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    get_db_path().parent.mkdir(parents=True, exist_ok=True)
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(get_db_path()) as conn:
         cursor = conn.cursor()
 
         # Create users table
@@ -152,6 +156,22 @@ def init_db():
         )
     """)
 
+        # Create parking_sessions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS parking_sessions (
+                id TEXT,
+                parking_lot_id TEXT,
+                licenseplate TEXT,
+                started TEXT,
+                stopped TEXT,
+                user TEXT,
+                cost REAL,
+                payment_status TEXT,
+                duration_minutes INTEGER,
+                PRIMARY KEY (id, parking_lot_id)
+            )
+        """)
+
         conn.commit()
         print("Database Created")
 
@@ -246,7 +266,7 @@ def get_table_columns(table_name: str) -> List[str]:
     Retrieves the column names from a specified SQLite table using a temporary connection.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             cursor = conn.cursor()
             cursor.execute(f"PRAGMA table_info({table_name!r})")
             columns = [info[1] for info in cursor.fetchall()]
@@ -265,7 +285,7 @@ def load_json_from_db(table_name: str) -> List[Dict]:
     """
     normalized_data = []
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(f"SELECT * FROM {table_name!r}")
@@ -286,7 +306,7 @@ def load_single_json_from_db(
     """
     normalized_data = None
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -326,7 +346,7 @@ def insert_single_json_to_db(table_name: str, item: Dict):
     )
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             conn.execute(sql_insert, values_to_insert)
             conn.commit()
     except sqlite3.OperationalError as e:
@@ -358,7 +378,7 @@ def update_single_json_in_db(
     sql_update = f'UPDATE "{table_name}" SET {set_sql} WHERE "{key_col}" = ?'
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             cursor = conn.cursor()
             cursor.execute(sql_update, tuple(values_to_update))
 
@@ -385,7 +405,7 @@ def save_json_to_db(table_name, data):
     # If no data, just delete and exit
     if not normalized_data:
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            with sqlite3.connect(get_db_path()) as conn:
                 conn.execute(f"DELETE FROM {table_name}")
                 conn.commit()
             return
@@ -411,7 +431,7 @@ def save_json_to_db(table_name, data):
     sql_delete = f"DELETE FROM {table_name}"
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             cursor = conn.cursor()
             cursor.execute(sql_delete)
             cursor.executemany(sql_insert, values_to_insert)
@@ -433,9 +453,7 @@ def load_user_data_from_db():
 
 def save_user_data_to_db(data):
     if use_mock_data:
-        users = load_data(MOCK_USERS)
-        users.append(data)
-        save_data(MOCK_USERS, users)
+        save_data(MOCK_USERS, data)
         return
     save_json_to_db("users", data)
 
@@ -455,17 +473,17 @@ def get_user_data_by_username(username: str) -> Optional[Dict]:
 def load_parking_lot_data_from_db():
     if use_mock_data:
         return load_data(MOCK_PARKING_LOTS)
-    return load_json_from_db("parking_lots")
+    lots_list = load_json_from_db("parking_lots")
+    # Return as dict keyed by id for consistency with the app's expectations
+    return {str(lot["id"]): lot for lot in lots_list if "id" in lot}
 
 
 def save_parking_lot_data_to_db(data):
     if use_mock_data:
-        parking_lots = load_data(MOCK_PARKING_LOTS)
-        lot_id = data.get("id")
-        parking_lots[lot_id] = data
-        save_data(MOCK_PARKING_LOTS, parking_lots)
+        save_data(MOCK_PARKING_LOTS, data)
         return
-    save_json_to_db("parking_lots", data)
+    # Convert dictionary of parking lots to list for DB storage
+    save_json_to_db("parking_lots", list(data.values()))
 
 
 # --- Reservations ---
@@ -477,11 +495,21 @@ def load_reservation_data_from_db():
 
 def save_reservation_data_to_db(data):
     if use_mock_data:
-        reservations = load_data(MOCK_RESERVATIONS)
-        reservations.append(data)
-        save_data(MOCK_RESERVATIONS, reservations)
+        save_data(MOCK_RESERVATIONS, data)
         return
     save_json_to_db("reservations", data)
+
+
+def update_existing_reservation_in_db(reservation_id: str, reservation_data: Dict):
+    if use_mock_data:
+        reservations = load_reservation_data()
+        for reservation in reservations:
+            if reservation.get("id") == reservation_id:
+                reservation.update(reservation_data)
+                save_data(MOCK_RESERVATIONS, reservations)
+                return
+        raise ValueError("Reservation not found")
+    update_single_json_in_db("reservations", "id", reservation_id, reservation_data)
 
 
 # --- Payments (Targeted functions for /payments endpoint) ---
@@ -513,7 +541,7 @@ def get_payments_by_initiator(initiator: str) -> List[Dict]:
 
     normalized_data = []
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM payments WHERE "initiator" = ?', (initiator,))
@@ -540,7 +568,7 @@ def get_refunds_for_user(username: str) -> List[Dict]:
 
     normalized_data = []
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             # Select all columns from refunds table
@@ -687,7 +715,7 @@ def get_refunds_by_transaction_id(transaction_id: str) -> List[Dict]:
                 filtered_refunds.append(refund)
         return filtered_refunds
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -795,13 +823,14 @@ def save_parking_lot_data(data):
 
 
 def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate="TEST-PLATE"):
-    filename = f"./data/pdata/p{parking_lot_id}-sessions.json"
     if use_mock_data:
         filename = MOCK_PARKING_SESSIONS
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
+        with open(filename, "r") as f:
+            sessions = json.load(f)
+    else:
+        sessions = load_parking_session_data_from_db(parking_lot_id)
 
-    for k, v in parking_lots.items():
+    for k, v in sessions.items():
         if v.get("licenseplate") == licenseplate:
             return k
 
@@ -845,17 +874,82 @@ def save_refunds_data(data):
     save_json_to_db("refunds", data)
 
 
+def load_parking_session_data_from_db(parking_lot_id: str) -> Dict[str, Dict]:
+    normalized_data = []
+    try:
+        with sqlite3.connect(get_db_path()) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM parking_sessions WHERE parking_lot_id = ?", (parking_lot_id,))
+            for row in cursor:
+                normalized_data.append(dict(row))
+    except sqlite3.OperationalError as e:
+        print(f"Error loading parking sessions for lot '{parking_lot_id}': {e}")
+        return {}
+
+    sessions_list = unnormalize_data(normalized_data)
+    # Convert list back to dict keyed by ID
+    sessions_dict = {}
+    for session in sessions_list:
+        if "id" in session:
+            sessions_dict[session["id"]] = session
+    return sessions_dict
+
+
+def save_parking_session_data_to_db(data: Dict[str, Dict], parking_lot_id: str):
+    # Convert dict to list and ensure parking_lot_id is set
+    session_list = []
+    for session_id, session_data in data.items():
+        # Ensure session data has the ID (it might be in the key but not the body)
+        if "id" not in session_data:
+            session_data["id"] = session_id
+        session_data["parking_lot_id"] = parking_lot_id
+        session_list.append(session_data)
+    
+    # 1. Normalize
+    normalized_data = normalize_data(session_list)
+
+    # 2. Delete existing sessions for this lot
+    try:
+        with sqlite3.connect(get_db_path()) as conn:
+            conn.execute("DELETE FROM parking_sessions WHERE parking_lot_id = ?", (parking_lot_id,))
+            
+            if not normalized_data:
+                conn.commit()
+                return
+
+            # 3. Prepare insert
+            insert_columns = list(normalized_data[0].keys())
+            values_to_insert = []
+            for item in normalized_data:
+                values_to_insert.append(tuple(item.get(col, None) for col in insert_columns))
+
+            column_names_sql = ", ".join([f'"{col}"' for col in insert_columns])
+            placeholders_sql = ", ".join(["?"] * len(insert_columns))
+
+            sql_insert = (
+                f"INSERT INTO parking_sessions ({column_names_sql}) VALUES ({placeholders_sql})"
+            )
+            
+            cursor = conn.cursor()
+            cursor.executemany(sql_insert, values_to_insert)
+            conn.commit()
+
+    except sqlite3.OperationalError as e:
+        print(f"Error saving parking sessions for lot '{parking_lot_id}': {e}")
+
+
 def save_parking_session_data(data, lid):
     if use_mock_data:
         save_data(MOCK_PARKING_SESSIONS, data)
         return
-    save_data(f"data/pdata/p{lid}-sessions.json", data)
+    save_parking_session_data_to_db(data, lid)
 
 
 def load_parking_session_data(lid):
     if use_mock_data:
         return load_data(MOCK_PARKING_SESSIONS)
-    return load_data(f"data/pdata/p{lid}-sessions.json")
+    return load_parking_session_data_from_db(lid)
 
 
 # vehicles
@@ -938,7 +1032,7 @@ def delete_vehicle_from_db(vehicle_id: str):
         return True
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(get_db_path()) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM vehicles WHERE id == ?", (vehicle_id,))
             conn.commit()
@@ -966,7 +1060,6 @@ def load_vehicle_data_from_db():
 
 def save_vehicle_data_to_db(data):
     if use_mock_data:
-        vehicles = load_data(MOCK_VEHICLES)
-        vehicles.append(data)
-        return save_data(MOCK_VEHICLES, vehicles)
-    insert_single_json_to_db("vehicles", data)
+        save_data(MOCK_VEHICLES, data)
+        return
+    save_json_to_db("vehicles", data)

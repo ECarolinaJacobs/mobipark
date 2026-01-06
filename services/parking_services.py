@@ -313,8 +313,7 @@ def update_reservation_end_time(reservation_id: str, end_time: str):
 
     for reservation in reservations:
         if reservation.get("id") == reservation_id:
-            reservation["end_time"] = end_time
-            storage_utils.save_reservation_data(reservations)
+            storage_utils.update_existing_reservation_in_db(reservation_id, {"end_time": end_time})
             return
 
     raise HTTPException(

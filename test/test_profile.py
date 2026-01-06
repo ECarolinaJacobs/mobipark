@@ -1,5 +1,6 @@
 import pytest
 import requests
+from test.test_utils import delete_user
 
 url = "http://localhost:8000"
 
@@ -15,6 +16,7 @@ def test_user():
 #a helper method to register and login a user, returning the auth header
 @pytest.fixture
 def auth_header(test_user):
+    delete_user(test_user["username"])
     requests.post(f"{url}/register", json=test_user)
 
     res = requests.post(f"{url}/login", json={
@@ -85,6 +87,7 @@ def test_update_profile_name(auth_header):
 
 # this checks that a user can update their password successfully
 def test_update_profile_password(test_user):
+    delete_user(test_user["username"])
     requests.post(f"{url}/register", json=test_user)
 
     login_res = requests.post(f"{url}/login", json={

@@ -38,7 +38,7 @@ MOCK_VEHICLE_2 = {
 class TestCreateVehicle:
     @patch("endpoints.vehicles_endpoint.get_session")
     @patch("endpoints.vehicles_endpoint.load_vehicle_data_from_db")
-    @patch("endpoints.vehicles_endpoint.save_vehicle_data_to_db")
+    @patch("endpoints.vehicles_endpoint.save_new_vehicle_to_db")
     @patch("uuid.uuid4")
     def test_create_vehicle_success(self, mock_uuid, mock_save, mock_load, mock_session):
         mock_session.return_value = MOCK_USER

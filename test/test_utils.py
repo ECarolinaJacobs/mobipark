@@ -1,20 +1,18 @@
 import requests
 import json
 import os
-from pathlib import Path
 import random
 from utils import storage_utils
 from dotenv import find_dotenv
 
 find_dotenv()
-use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
-MOCK_PARKING_LOTS = (Path(__file__).parent.parent / "mock_data/mock_parking-lots.json").resolve()
-MOCK_PARKING_SESSIONS = (Path(__file__).parent.parent / "mock_data/pdata/mock_p1-sessions.json").resolve()
-MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolve()
 
 url = "http://localhost:8000/"
 
 def create_user(isAdmin, username="test", password="test"):
+    # Ensure clean slate
+    delete_user(username)
+    
     requests.post(f"{url}/register", json={"username": username, "password": password, "name": "tester"})
 
     if isAdmin:
@@ -23,76 +21,47 @@ def create_user(isAdmin, username="test", password="test"):
         update_user_role(username, "USER")
 
 def delete_user(username="test"):
-    filename = "../data/users.json"
-    if use_mock_data:
-        filename = MOCK_USERS
-    with open(filename, "r") as f:
-        users = json.load(f)
-    
+    users = storage_utils.load_user_data()
     new_users = [u for u in users if u["username"] != username]
-    with open(filename, "w") as f:
-        json.dump(new_users, f)
+    storage_utils.save_user_data(new_users)
 
 def update_user_role(username, role):
-    filename = "../data/users.json"
-    if use_mock_data:
-        filename = MOCK_USERS
-    with open (filename, "r") as f:
-        users = json.load(f)
+    users = storage_utils.load_user_data()
     for user in users:
         if user["username"] == username:
             user["role"] = role
-    with open(filename, "w") as f:
-        json.dump(users, f)
+    storage_utils.save_user_data(users)
 
 def delete_parking_lot(name="TEST_PARKING_LOT"):
-    filename = "../data/parking-lots.json"
-    if use_mock_data:
-        filename = MOCK_PARKING_LOTS
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
-    
+    parking_lots = storage_utils.load_parking_lot_data()
     new_parking_lots = {k: v for k, v in parking_lots.items() if v.get("name") != name}
-
-    with open(filename, "w") as f:
-        json.dump(new_parking_lots, f)
+    storage_utils.save_parking_lot_data(new_parking_lots)
 
 def delete_parking_session(parking_lot_id: str, license_plate="TEST-PLATE"):
-    filename = f"../data/pdata/p{parking_lot_id}-sessions.json"
-    if use_mock_data:
-        filename = MOCK_PARKING_SESSIONS
-    with open(filename, "r") as f:
-        sessions = json.load(f)
+    sessions = storage_utils.load_parking_session_data(parking_lot_id)
     new_parking_sessions = {k: v for k, v in sessions.items() if v.get("licenseplate") != license_plate}
-    with open(filename, "w") as f:
-        json.dump(new_parking_sessions, f)
+    storage_utils.save_parking_session_data(new_parking_sessions, parking_lot_id)
 
 def find_parking_lot_id_by_name():
-    filename = "../data/parking-lots.json"
-    if use_mock_data:
-        filename = MOCK_PARKING_LOTS
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
-
+    parking_lots = storage_utils.load_parking_lot_data()
     for k, v in parking_lots.items():
         if v.get("name") == "TEST_PARKING_LOT":
             return k
         
 def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str):
-    filename = f"../data/pdata/p{parking_lot_id}-sessions.json"
-    if use_mock_data:
-        filename = MOCK_PARKING_SESSIONS
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
-
-    for k, v in parking_lots.items():
+    sessions = storage_utils.load_parking_session_data(parking_lot_id)
+    for k, v in sessions.items():
         if v.get("licenseplate") == licenseplate:
             return k
 
 def get_session(username="test", password="test"):
     res = requests.post(f"{url}/login", json={"username": username, "password": password})
-    ses_token = res.json()["session_token"]
-    return {"Authorization": ses_token}
+    try:
+        ses_token = res.json()["session_token"]
+        return {"Authorization": ses_token}
+    except KeyError:
+        # Fallback or error handling if login fails
+        raise Exception(f"Login failed for {username}: {res.text}")
 
 def create_random_dutch_plate():
     patterns = [
