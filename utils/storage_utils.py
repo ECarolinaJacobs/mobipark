@@ -11,6 +11,11 @@ use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 MOCK_PARKING_LOTS = (Path(__file__).parent.parent / "mock_data/mock_parking-lots.json").resolve()
 MOCK_PARKING_SESSIONS = (Path(__file__).parent.parent / "mock_data/pdata/mock_p1-sessions.json").resolve()
 MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolve()
+MOCK_RESERVATIONS = (Path(__file__).parent.parent / "mock_data/mock_reservations.json").resolve()
+MOCK_PAYMENTS = (Path(__file__).parent.parent / "mock_data/mock_payments.json").resolve()
+MOCK_DISCOUNTS = (Path(__file__).parent.parent / "mock_data/mock_discounts.json").resolve()
+MOCK_REFUNDS = (Path(__file__).parent.parent / "mock_data/mock_refunds.json").resolve()
+MOCK_VEHICLES = (Path(__file__).parent.parent / "mock_data/mock_vehicles.json").resolve()
 
 # Define the database path globally
 DB_PATH = Path(__file__).parent / "../data/mobypark.db"
@@ -270,10 +275,15 @@ def save_json_to_db(table_name, data):
 
 # --- Users ---
 def load_user_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_USERS)
     return load_json_from_db("users")
 
 
 def save_user_data_to_db(data):
+    if use_mock_data:
+        save_data(MOCK_USERS, data)
+        return
     save_json_to_db("users", data)
 
 
@@ -284,24 +294,36 @@ def get_user_data_by_username(username: str) -> Optional[Dict]:
 
 # --- Parking Lots ---
 def load_parking_lot_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_PARKING_LOTS)
     return load_json_from_db("parking_lots")
 
 
 def save_parking_lot_data_to_db(data):
+    if use_mock_data:
+        save_data(MOCK_PARKING_LOTS, data)
+        return
     save_json_to_db("parking_lots", data)
 
 
 # --- Reservations ---
 def load_reservation_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_RESERVATIONS)
     return load_json_from_db("reservations")
 
 
 def save_reservation_data_to_db(data):
+    if use_mock_data:
+        save_data(MOCK_RESERVATIONS, data)
+        return
     save_json_to_db("reservations", data)
 
 
 # --- Payments (Targeted functions for /payments endpoint) ---
 def load_payment_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_PAYMENTS)
     return load_json_from_db("payments")
 
 
@@ -310,6 +332,9 @@ def get_payment_data_by_id(payment_id: str) -> Optional[Dict]:
 
 
 def save_new_payment_to_db(payment_data: Dict):
+    if use_mock_data:
+        save_data(MOCK_PAYMENTS, payment_data)
+        return
     insert_single_json_to_db("payments", payment_data)
 
 
@@ -324,6 +349,8 @@ def update_existing_payment_in_db(payment_id: str, payment_data: Dict):
 
 # --- Discounts ---
 def load_discounts_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_DISCOUNTS)
     return load_json_from_db("discounts")
 
 
@@ -332,6 +359,9 @@ def get_discount_by_code(discount_code: str) -> Optional[Dict]:
 
 
 def save_new_discount_to_db(discount_data: Dict):
+    if use_mock_data:
+        save_data(MOCK_DISCOUNTS, discount_data)
+        return
     insert_single_json_to_db("discounts", discount_data)
 
 
@@ -340,11 +370,16 @@ def update_existing_discount_in_db(discount_code: str, discount_data: Dict):
 
 
 def save_discounts_data_to_db(data):
+    if use_mock_data:
+        save_data(MOCK_DISCOUNTS, data)
+        return
     save_json_to_db("discounts", data)
 
 
 # --- Refunds ---
 def load_refunds_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_REFUNDS)
     return load_json_from_db("refunds")
 
 
@@ -353,6 +388,9 @@ def get_refund_by_id(refund_id: str) -> Optional[Dict]:
 
 
 def save_new_refund_to_db(refund_data: Dict):
+    if use_mock_data:
+        save_data(MOCK_REFUNDS, refund_data)
+        return
     insert_single_json_to_db("refunds", refund_data)
 
 
@@ -528,11 +566,18 @@ VEHICLE_FILE = "data/vehicles.json"
 
 def load_vehicle_data():
     """Load all vehicles from JSON file."""
+    if use_mock_data:
+        return load_data(MOCK_VEHICLES)
     return load_data(VEHICLE_FILE)
 
 
 def save_vehicle_data(data):
     """Save the full vehicle dataset to JSON file."""
+    if use_mock_data:
+        vehicles = load_vehicle_data()
+        vehicles.append(data)
+        save_data(MOCK_VEHICLES, vehicles)
+        return
     save_data(VEHICLE_FILE, data)
 
 
@@ -552,6 +597,8 @@ def get_vehicle_data_by_id(vehicle_id: str):
 def get_vehicle_data_by_user(user_id: str):
     """Return all vehicles owned by a specific user."""
     vehicles = load_json_from_db("vehicles")
+    if use_mock_data:
+        vehicles = load_vehicle_data()
     return [v for v in vehicles if v.get("user_id") == user_id]
 
 
@@ -571,14 +618,33 @@ def save_new_vehicle_to_db(vehicle_data: Dict):
         raise ValueError("Vehicle already exists")
 
     vehicles.append(vehicle_data)
+    if use_mock_data:
+        save_data(MOCK_VEHICLES, vehicles)
+        return
     save_vehicle_data(vehicles)
 
 
 def update_existing_vehicle_in_db(vehicle_id: str, vehicle_data: Dict):
+    if use_mock_data:
+        vehicles = load_vehicle_data()
+        for vehicle in vehicles:
+            if vehicle.get("id") == vehicle_id:
+                vehicle.update(vehicle_data)
+                save_data(MOCK_VEHICLES, vehicles)
+                return
+        raise ValueError("Vehicle not found")
     update_single_json_in_db("vehicles", "id", vehicle_id, vehicle_data)
 
 
 def delete_vehicle_from_db(vehicle_id: str):
+    if use_mock_data:
+        vehicles = load_vehicle_data()
+        new_vehicles = [vehicle for vehicle in vehicles if vehicle.get("id") != vehicle_id]
+        if len(new_vehicles) == len(vehicles):
+            raise ValueError("Vehicle not found")
+        save_data(MOCK_VEHICLES, new_vehicles)
+        return True
+
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
@@ -595,8 +661,14 @@ def get_user_data_by_username_for_vehicles(username: str) -> Optional[Dict]:
 
 
 def load_vehicle_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_VEHICLES)
     return load_json_from_db("vehicles")
 
 
 def save_vehicle_data_to_db(data):
+    if use_mock_data:
+        vehicles = load_data(MOCK_VEHICLES)
+        vehicles.append(data)
+        return save_data(MOCK_VEHICLES, vehicles)
     insert_single_json_to_db("vehicles", data)
