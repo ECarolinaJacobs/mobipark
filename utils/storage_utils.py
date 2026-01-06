@@ -328,6 +328,12 @@ def load_payment_data_from_db():
 
 
 def get_payment_data_by_id(payment_id: str) -> Optional[Dict]:
+    if use_mock_data:
+        payments = load_data(MOCK_PAYMENTS)
+        for payment in payments:
+            if payment.get("transaction") == payment_id:
+                return payment
+        return ValueError("Payment not found")
     return load_single_json_from_db("payments", key_col="transaction", key_val=payment_id)
 
 
@@ -339,6 +345,14 @@ def save_new_payment_to_db(payment_data: Dict):
 
 
 def update_existing_payment_in_db(payment_id: str, payment_data: Dict):
+    if use_mock_data:
+        payments = load_data(MOCK_PAYMENTS)
+        for payment in payments:
+            if payment.get("transaction") == payment_id:
+                payment.update(payment_data)
+                save_data(MOCK_PAYMENTS, payments)
+                return
+        raise ValueError("Vehicle not found")
     update_single_json_in_db("payments", key_col="transaction", key_val=payment_id, update_item=payment_data)
 
 
@@ -355,6 +369,12 @@ def load_discounts_data_from_db():
 
 
 def get_discount_by_code(discount_code: str) -> Optional[Dict]:
+    if use_mock_data:
+        discounts = load_data(MOCK_DISCOUNTS)
+        for discount in discounts:
+            if discount.get("code") == discount_code:
+                return discount
+        return ValueError("Discount not found")
     return load_single_json_from_db("discounts", key_col="code", key_val=discount_code)
 
 
@@ -366,6 +386,14 @@ def save_new_discount_to_db(discount_data: Dict):
 
 
 def update_existing_discount_in_db(discount_code: str, discount_data: Dict):
+    if use_mock_data:
+        discounts = load_data(MOCK_PAYMENTS)
+        for discount in discounts:
+            if discount.get("code") == discount_code:
+                discount.update(discount_data)
+                save_data(MOCK_DISCOUNTS, discounts)
+                return
+        raise ValueError("Discount not found")
     update_single_json_in_db("discounts", key_col="code", key_val=discount_code, update_item=discount_data)
 
 
@@ -384,6 +412,12 @@ def load_refunds_data_from_db():
 
 
 def get_refund_by_id(refund_id: str) -> Optional[Dict]:
+    if use_mock_data:
+        refunds = load_data(MOCK_REFUNDS)
+        for refund in refunds:
+            if refund.get("refund_id") == refund_id:
+                return refund
+        return ValueError("Refund not found")
     return load_single_json_from_db("refunds", key_col="refund_id", key_val=refund_id)
 
 
@@ -395,11 +429,26 @@ def save_new_refund_to_db(refund_data: Dict):
 
 
 def update_existing_refund_in_db(refund_id: str, refund_data: Dict):
+    if use_mock_data:
+        refunds = load_data(MOCK_REFUNDS)
+        for refund in refunds:
+            if refund.get("refund_id") == refund_id:
+                refund.update(refund_data)
+                save_data(MOCK_REFUNDS, refunds)
+                return
+        raise ValueError("Refund not found")
     update_single_json_in_db("refunds", key_col="refund_id", key_val=refund_id, update_item=refund_data)
 
 
 def get_refunds_by_transaction_id(transaction_id: str) -> List[Dict]:
     """Get all refunds for a specific transaction"""
+    if use_mock_data:
+        filtered_refunds = []
+        refunds = load_data(MOCK_REFUNDS)
+        for refund in refunds:
+            if refund.get("transaction_id") == transaction_id:
+                filtered_refunds.append(refund)
+        return filtered_refunds
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
