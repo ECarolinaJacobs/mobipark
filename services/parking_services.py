@@ -205,7 +205,8 @@ def stop_parking_session(parking_lot_id: str,
                 "payment_status": "Pending"
             }
 
-            parking_session_id = find_parking_session_id_by_plate(parking_lot_id, updated_parking_session_entry.get("licenseplate"))
+            parking_lots = storage_utils.load_parking_lot_data()
+            parking_session_id = storage_utils.find_parking_session_id_by_plate(parking_lot_id, updated_parking_session_entry.get("licenseplate"))
 
             session_price = calculate_price(parking_lots[parking_lot_id], parking_session_id, updated_parking_session_entry)
             updated_parking_session_entry["cost"] = session_price[0] # calculate_price() returns tuple, index 0 is the calculated price
@@ -285,15 +286,6 @@ def get_parking_session(parking_lot_id: str, session_user: Dict[str, str] = Depe
         return user_sessions
     else:
         return parking_sessions
-
-def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate="TEST-PLATE"):
-    filename = f"./data/pdata/p{parking_lot_id}-sessions.json"
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
-
-    for k, v in parking_lots.items():
-        if v.get("licenseplate") == licenseplate:
-            return k
         
 def find_reservation_by_license_plate(parking_lot_id: str, license_plate: str) -> Optional[Dict]:
 
@@ -328,4 +320,4 @@ def update_reservation_end_time(reservation_id: str, end_time: str):
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="Reservation not found"
-    ) 
+    )

@@ -1,10 +1,10 @@
 import pytest
 import requests
 import json
+from utils.storage_utils import load_parking_lot_data
 from test.test_utils import create_user, delete_user, get_session, delete_parking_lot, find_parking_lot_id_by_name, find_parking_session_id_by_plate, delete_parking_session, url,create_random_dutch_plate
 
     # TODO: TEST EDGE CASES
-    
 
     # POST ENDPOINTS #
 
@@ -174,9 +174,7 @@ def test_update_parking_lot():
         }}, 
     headers=headers)
 
-    filename = "../data/parking-lots.json"
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
+    parking_lots = load_parking_lot_data()
 
     key_to_update = None
     for k, v in parking_lots.items():
