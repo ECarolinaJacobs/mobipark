@@ -34,16 +34,29 @@ def delete_user(username="test"):
         json.dump(new_users, f)
 
 def update_user_role(username, role):
-    filename = "../data/users.json"
+    # filename = "../data/users.json"
+    # if use_mock_data:
+    #     filename = MOCK_USERS
+    # with open (filename, "r") as f:
+    #     users = json.load(f)
+    # for user in users:
+    #     if user["username"] == username:
+    #         user["role"] = role
+    # with open(filename, "w") as f:
+    #     json.dump(users, f)
+    users = None
     if use_mock_data:
-        filename = MOCK_USERS
-    with open (filename, "r") as f:
-        users = json.load(f)
+        users = storage_utils.load_data(MOCK_USERS)
+    else:
+        users = storage_utils.load_user_data_from_db()
     for user in users:
         if user["username"] == username:
             user["role"] = role
-    with open(filename, "w") as f:
-        json.dump(users, f)
+            if use_mock_data:
+                storage_utils.save_data(MOCK_USERS, users)
+                return
+            storage_utils.save_user_data_to_db(users)
+            return
 
 def delete_parking_lot(name="TEST_PARKING_LOT"):
     filename = "../data/parking-lots.json"

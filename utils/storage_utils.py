@@ -779,18 +779,28 @@ def load_data(filename):
 
 
 def load_user_data():
+    if use_mock_data:
+        return load_data(MOCK_USERS)
     return load_user_data_from_db()
 
 
 def save_user_data(data):
+    if use_mock_data:
+        save_data(MOCK_USERS, data)
+        return
     return save_user_data_to_db(data)
 
 
 def load_parking_lot_data():
+    if use_mock_data:
+        return load_data(MOCK_PARKING_LOTS)
     return load_parking_lot_data_from_db()
 
 
 def save_parking_lot_data(data):
+    if use_mock_data:
+        save_data(MOCK_PARKING_LOTS, data)
+        return
     return save_parking_lot_data_to_db(data)
 
 
@@ -807,14 +817,21 @@ def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate="TEST-PLA
 
 
 def load_reservation_data():
+    if use_mock_data:
+        return load_data(MOCK_RESERVATIONS)
     return load_reservation_data_from_db()
 
 
 def save_reservation_data(data):
+    if use_mock_data:
+        save_data(MOCK_RESERVATIONS, data)
+        return
     return save_reservation_data_to_db(data)
 
 
 def load_payment_data():
+    if use_mock_data:
+        return load_data(MOCK_PAYMENTS)
     return load_payment_data_from_db()
 
 
@@ -826,14 +843,21 @@ def save_payment_data(data):
 
 
 def load_discounts_data():
+    if use_mock_data:
+        return load_data(MOCK_DISCOUNTS)
     return load_discounts_data_from_db()
 
 
 def save_discounts_data(data):
+    if use_mock_data:
+        save_data(MOCK_DISCOUNTS, data)
+        return
     return save_discounts_data_to_db(data)
 
 
 def load_refunds_data():
+    if use_mock_data:
+        return load_data(MOCK_REFUNDS)
     return load_refunds_data_from_db()
 
 
@@ -863,10 +887,15 @@ VEHICLE_FILE = "data/vehicles.json"
 
 
 def load_vehicle_data():
+    if use_mock_data:
+        return load_data(MOCK_VEHICLES)
     return load_vehicle_data_from_db()
 
 
 def save_vehicle_data(data):
+    if use_mock_data:
+        save_data(MOCK_VEHICLES, data)
+        return
     return save_vehicle_data_to_db(data)
 
 
