@@ -13,7 +13,10 @@ class RegisterRequest(BaseModel):
     name: str
     password: str
     role: Optional[str] = "USER"
-    managed_parking_lot_id: Optional[str] = None
+    managed_parking_lot_id: Optional[str] = None  # only for hotel managers
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    birth_year: Optional[int] = None
 
 
 class User(BaseModel):

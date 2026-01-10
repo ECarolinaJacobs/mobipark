@@ -3,6 +3,7 @@ import pytest
 import time
 import random
 import string
+import test_utils
 
 url = "http://localhost:8000/"
 
@@ -23,7 +24,6 @@ def register_login(username="vehicle_user", password="123", name=None, role="USE
     if res.status_code == 400 and "Username already exists" in res.text:
         login_data = {"username": username, "password": password}
         res = requests.post(f"{url}/auth/login", json=login_data)
-
     assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
     token = res.json().get("session_token")
     assert token, f"No token received from auth response: {res.text}"
@@ -34,8 +34,10 @@ def register_admin(username="admin_user", password="123", name="Admin"):
     name = name or username
     register_data = {"username": username, "password": password, "name": name}
     res = requests.post(f"{url}/auth/register", json=register_data)
+    test_utils.update_user_role(username, "ADMIN")
     if res.status_code == 400 and "Username already exists" in res.text:
         res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
+        test_utils.update_user_role(username, "ADMIN")
     assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
     token = res.json().get("session_token")
     assert token, f"No token received from auth response: {res.text}"
@@ -342,6 +344,9 @@ def test_admin_view_user_vehicles():
 # added test for get/vehicles/{license_plate}/reservations
 # test passed if reservation is sent back, returns 200
 def test_get_vehicle_reservations():
+    headers = register_admin("admin_user", "123", "Admin")
+    res_delete = requests.delete(f"{url}/vehicles/{"13-RD-11"}", headers=headers)
+    assert res_delete.status_code == 200
     headers = register_login("res_user", "123")
     vehicle_data = {
         "user_id": "test",

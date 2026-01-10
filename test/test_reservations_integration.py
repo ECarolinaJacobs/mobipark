@@ -296,7 +296,7 @@ def test_update_reservation_success(vehicle_creation_succes):
     assert res.status_code == 201
 
     reservation_id = res.json()["reservation"]["id"]
-    new_data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00", "parking_lot_id": "2"}
+    new_data = {"vehicle_id": vehicle["id"],"start_time": "2025-12-06T10:00", "parking_lot_id": "1"}
     res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
 
     assert res_put.status_code == 200   

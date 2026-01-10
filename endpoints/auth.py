@@ -5,6 +5,8 @@ import uuid, hashlib, secrets
 from utils.passwords import hash_password_bcrypt, verify_bcrypt, verify_md5
 from models.auth_model import LoginRequest, RegisterRequest, User
 from models.hotel_manager_model import HotelManagerCreate
+from models.profile_model import ProfileResponse, ProfileUpdateRequest
+import datetime
 
 router = APIRouter()
 
@@ -60,6 +62,10 @@ def register(register_data: RegisterRequest, response: Response, authorization: 
     name = register_data.name
     role = register_data.role.upper() if register_data.role else "USER"
 
+    email = register_data.email or ""
+    phone = register_data.phone or ""
+    birth_year = register_data.birth_year
+
     if not username or not password or not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing credentials")
 
@@ -81,7 +87,18 @@ def register(register_data: RegisterRequest, response: Response, authorization: 
     hashed_password = hash_password_bcrypt(password)
 
     new_user = User(
-        id=str(uuid.uuid4()), username=username, password=hashed_password, name=name, role=role
+        id=str(uuid.uuid4()),
+        username=username,
+        password=hashed_password,
+        hash_type="bcrypt",
+        name=name,
+        email=email,
+        phone=phone,
+        role=role,
+        created_at=str(datetime.now()),
+        birth_year=birth_year,
+        active=True,
+        managed_parking_lot_id=register_data.managed_parking_lot_id
     ).model_dump()
 
     new_user["hash_type"] = "bcrypt"

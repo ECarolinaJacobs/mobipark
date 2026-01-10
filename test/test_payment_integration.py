@@ -1,6 +1,8 @@
 import pytest
 import requests
 from datetime import datetime
+from utils import storage_utils
+import test_utils
 import uuid
 from urllib.parse import quote  # <--- NEW IMPORT
 
@@ -17,12 +19,31 @@ ADMIN_LOGIN = {
     "password": "admin",
 }
 
+USER_REGISTER = {
+    "username": "test",
+    "password": "test",
+    "name": "test"
+}
+
+ADMIN_REGISTER = {
+    "username": "admin",
+    "password": "admin",
+    "name": "admin"
+}
+
 
 # ============================================================================
 # AUTHENTICATION HELPER AND FIXTURES
 # ============================================================================
 
 def login(role: str = "user"):
+    if role == "user":
+        res = requests.post(f"{BASE_URL}register", json=USER_REGISTER)
+    else:
+        res = requests.post(f"{BASE_URL}register", json=ADMIN_REGISTER)
+        # Promote to admin after registration
+        test_utils.update_user_role("admin", "ADMIN")
+
     """Login and return authorization headers"""
     credentials = USER_LOGIN if role == "user" else ADMIN_LOGIN
     res = requests.post(url=f"{BASE_URL}login", json=credentials)
