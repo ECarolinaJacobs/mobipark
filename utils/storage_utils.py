@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 MOCK_PARKING_LOTS = (Path(__file__).parent.parent / "mock_data/mock_parking-lots.json").resolve()
-MOCK_PARKING_SESSIONS = (Path(__file__).parent.parent / "mock_data/pdata/mock_p1-sessions.json").resolve()
+MOCK_PARKING_SESSIONS = (Path(__file__).parent.parent / "mock_data/mock_parkingsessions.json").resolve()
 MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolve()
 MOCK_RESERVATIONS = (Path(__file__).parent.parent / "mock_data/mock_reservations.json").resolve()
 MOCK_PAYMENTS = (Path(__file__).parent.parent / "mock_data/mock_payments.json").resolve()
@@ -71,6 +71,22 @@ def init_db():
             )
         """)
 
+        # create parking sessions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS parking_sessions (
+            id TEXT PRIMARY KEY,
+            parking_lot_id text,
+            licenseplate TEXT,
+            started TEXT,
+            stopped TEXT,
+            user TEXT,
+            duration_minutes INTEGER,
+            cost REAL,
+            payment_status TEXT,
+            FOREIGN KEY (parking_lot_id) REFERENCES parking_lots (id)
+
+            ) """)
+                       
         # Create reservations table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS reservations (
@@ -999,3 +1015,31 @@ def save_vehicle_data_to_db(data):
         vehicles.append(data)
         return save_data(MOCK_VEHICLES, vehicles)
     insert_single_json_to_db("vehicles", data)
+
+
+# --- parking sessions ---
+def load_parking_sessions_data_from_db():
+    if use_mock_data:
+        return load_data(MOCK_PARKING_SESSIONS)
+    return load_json_from_db("parking_sessions")
+
+
+def get_sessions_data_by_id(session_id: str) -> Optional[Dict]:
+    if use_mock_data:
+        sessions = load_data(MOCK_PARKING_SESSIONS)
+        for session in sessions:
+            if session.get("id") == session_id:
+                return session
+        return None
+    return load_single_json_from_db(
+        "sessions", key_col="id", key_val=session_id
+    )
+
+def get_user_by_id(user_id) -> Optional[Dict]:
+    if use_mock_data:
+        users = load_data(MOCK_USERS)
+        for user in users:
+            if user.get("id") == user_id:
+                return user
+        return None
+    return load_single_json_from_db("users", "id", user_id)
