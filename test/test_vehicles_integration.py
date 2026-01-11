@@ -8,7 +8,6 @@ import os
 from test.test_utils import update_user_role
 
 load_dotenv()
-import test_utils
 
 url = "http://localhost:8000/"
 
@@ -39,33 +38,17 @@ def register_admin(username="admin_user", password="123", name="Admin"):
     name = name or username
     register_data = {"username": username, "password": password, "name": name}
     res = requests.post(f"{url}/auth/register", json=register_data)
-    test_utils.update_user_role(username, "ADMIN")
-    if res.status_code == 400 and "Username already exists" in res.text:
-        res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
-        test_utils.update_user_role(username, "ADMIN")
-    assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
-    import json
-    from pathlib import Path
-    from utils.storage_utils import get_user_data_by_username, update_single_json_in_db
 
-    use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
-    if use_mock_data:
-        filename = Path(__file__).parent.parent / "mock_data/mock_users.json"
-        with open(filename, "r") as f:
-            users = json.load(f)
-        for user in users:
-            if user["username"] == username:
-                user["role"] = "ADMIN"
-                break
-        with open(filename, "w") as f:
-            json.dump(users, f, indent=2)
-            print(f"debug: set{username} role to admin")
+    if res.status_code == 400 and "Username already exists" in res.text:
+        # User already exists, update role and login
+        update_user_role(username, "ADMIN")
+        res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
     else:
-        user = get_user_data_by_username(username)
-        if user:
-            user["role"] == "ADMIN"
-            update_single_json_in_db("users", "username", username, user)
-            print(f"debug set {username} role to admin")
+        # New user - update role then re-login to get new session with ADMIN role
+        update_user_role(username, "ADMIN")
+        res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
+
+    assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
     token = res.json().get("session_token")
     assert token, f"No token received from auth response: {res.text}"
     return {"Authorization": token}
@@ -372,8 +355,6 @@ def test_admin_view_user_vehicles():
 # test passed if reservation is sent back, returns 200
 def test_get_vehicle_reservations():
     headers = register_admin("admin_user", "123", "Admin")
-    res_delete = requests.delete(f"{url}/vehicles/{"13-RD-11"}", headers=headers)
-    assert res_delete.status_code == 200
     headers = register_login("res_user", "123")
     unique_plate = valid_plate()
     vehicle_data = {

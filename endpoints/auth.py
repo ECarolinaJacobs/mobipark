@@ -98,13 +98,13 @@ def register(register_data: RegisterRequest, response: Response, authorization: 
         created_at=str(datetime.now()),
         birth_year=birth_year,
         active=True,
-        managed_parking_lot_id=register_data.managed_parking_lot_id
+        managed_parking_lot_id=register_data.managed_parking_lot_id,
     ).model_dump()
 
     new_user["hash_type"] = "bcrypt"
 
-    # users.append(new_user) //changed because this creates a nested list, but should be list
-    save_user_data(new_user) 
+    users.append(new_user)
+    save_user_data(users)
 
     token = str(uuid.uuid4())
     add_session(token, new_user)
@@ -151,8 +151,8 @@ def register_hotel_manager(hotel_manager_data: HotelManagerCreate, authorization
         managed_parking_lot_id=hotel_manager_data.parking_lot_id,
     ).model_dump()
     new_hotel_manager["hash_type"] = "bcrypt"
-    # users.append(new_hotel_manager)
-    save_user_data(new_hotel_manager)
+    users.append(new_hotel_manager)
+    save_user_data(users)
     return {
         "message": f"Hotel manager {hotel_manager_data.username} created successfully",
         "username": hotel_manager_data.username,
