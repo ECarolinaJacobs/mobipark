@@ -10,6 +10,8 @@ from endpoints.hotel_manager_endpoint import router as hotel_manager_router
 from endpoints.reservations import router as reservations_router
 from endpoints.vehicles_endpoint import router as vehicle_router
 from utils.storage_utils import init_db
+from dotenv import load_dotenv
+load_dotenv()
 
 init_db()
 app = FastAPI()

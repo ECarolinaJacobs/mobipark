@@ -3,6 +3,11 @@ import pytest
 import time
 import random
 import string
+from dotenv import load_dotenv
+import os
+from test.test_utils import update_user_role
+
+load_dotenv()
 
 url = "http://localhost:8000/"
 
@@ -37,6 +42,28 @@ def register_admin(username="admin_user", password="123", name="Admin"):
     if res.status_code == 400 and "Username already exists" in res.text:
         res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
     assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
+    import json
+    from pathlib import Path
+    from utils.storage_utils import get_user_data_by_username, update_single_json_in_db
+
+    use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
+    if use_mock_data:
+        filename = Path(__file__).parent.parent / "mock_data/mock_users.json"
+        with open(filename, "r") as f:
+            users = json.load(f)
+        for user in users:
+            if user["username"] == username:
+                user["role"] = "ADMIN"
+                break
+        with open(filename, "w") as f:
+            json.dump(users, f, indent=2)
+            print(f"debug: set{username} role to admin")
+    else:
+        user = get_user_data_by_username(username)
+        if user:
+            user["role"] == "ADMIN"
+            update_single_json_in_db("users", "username", username, user)
+            print(f"debug set {username} role to admin")
     token = res.json().get("session_token")
     assert token, f"No token received from auth response: {res.text}"
     return {"Authorization": token}
@@ -343,9 +370,10 @@ def test_admin_view_user_vehicles():
 # test passed if reservation is sent back, returns 200
 def test_get_vehicle_reservations():
     headers = register_login("res_user", "123")
+    unique_plate = valid_plate()
     vehicle_data = {
         "user_id": "test",
-        "license_plate": "13-RD-11",
+        "license_plate": unique_plate,
         "make": "Renault",
         "model": "Clio",
         "color": "Blue",
@@ -361,7 +389,7 @@ def test_get_vehicle_reservations():
         "parking_lot_id": "1",
     }
     res_create = requests.post(f"{url}/reservations/", json=reservation_data, headers=headers)
-    lid = "13RD11"
+    lid = unique_plate.replace("-", "").upper()
     res = requests.get(f"{url}/vehicles/{lid}/reservations", headers=headers)
     body = res.json()
     assert "reservations" in body
@@ -397,6 +425,10 @@ def test_get_vehicle_history():
     start_res = requests.post(
         f"{url}/parking-lots/{lot_id}/sessions/start", json=session_data, headers=user_headers
     )
+    print("START SESSION:", start_res.status_code, start_res.text)
+    print("Sent headers:", user_headers)
+    print("Sent session_data:", session_data)
+
     assert start_res.status_code == 200
     time.sleep(2)
     stop_res = requests.put(
