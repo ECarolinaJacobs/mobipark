@@ -6,7 +6,7 @@ from utils.passwords import hash_password_bcrypt, verify_bcrypt, verify_md5
 from models.auth_model import LoginRequest, RegisterRequest, User
 from models.hotel_manager_model import HotelManagerCreate
 from models.profile_model import ProfileResponse, ProfileUpdateRequest
-import datetime
+from datetime import datetime
 
 router = APIRouter()
 
@@ -103,8 +103,8 @@ def register(register_data: RegisterRequest, response: Response, authorization: 
 
     new_user["hash_type"] = "bcrypt"
 
-    users.append(new_user)
-    save_user_data(users)
+    # users.append(new_user) //changed because this creates a nested list, but should be list
+    save_user_data(new_user) 
 
     token = str(uuid.uuid4())
     add_session(token, new_user)
@@ -151,8 +151,8 @@ def register_hotel_manager(hotel_manager_data: HotelManagerCreate, authorization
         managed_parking_lot_id=hotel_manager_data.parking_lot_id,
     ).model_dump()
     new_hotel_manager["hash_type"] = "bcrypt"
-    users.append(new_hotel_manager)
-    save_user_data(users)
+    # users.append(new_hotel_manager)
+    save_user_data(new_hotel_manager)
     return {
         "message": f"Hotel manager {hotel_manager_data.username} created successfully",
         "username": hotel_manager_data.username,

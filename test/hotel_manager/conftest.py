@@ -9,7 +9,15 @@ import uuid
 from utils.session_manager import add_session, sessions
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
+def cleanup_sessions():
+    """automatically clean up sessions before and after each test"""
+    sessions.clear()  # before test
+    yield
+    sessions.clear()  # after test
+
+
+@pytest.fixture(scope="function")
 def test_db():
     """create a temporary test database with schema and seed data for hotel manager feauture"""
     db_fd, db_path = tempfile.mkstemp(suffix=".db")
@@ -156,6 +164,8 @@ def test_db():
 def client(test_db, monkeypatch):
     """creates fastapi test client with test database"""
     monkeypatch.setenv("TEST_DB_PATH", str(test_db))
+    monkeypatch.setenv("USE_MOCK_DATA", "false")
+
     import sys
 
     if "utils.storage_utils" in sys.modules:
@@ -163,16 +173,43 @@ def client(test_db, monkeypatch):
         from pathlib import Path
 
         storage_utils.DB_PATH = Path(test_db)
+        storage_utils.use_mock_data = False
     else:
         from utils import storage_utils
+
+        storage_utils.use_mock_data = False
+
     assert str(storage_utils.DB_PATH) == str(test_db), "DB_PATH not set correctly"
 
-    # Patch all the file-based functions to use database versions
     monkeypatch.setattr(storage_utils, "load_parking_lot_data", storage_utils.load_parking_lot_data_from_db)
     monkeypatch.setattr(storage_utils, "load_user_data", storage_utils.load_user_data_from_db)
-    monkeypatch.setattr(storage_utils, "save_user_data", storage_utils.save_user_data_to_db)
+
+    def save_single_user_to_db(user_data):
+        storage_utils.insert_single_json_to_db("users", user_data)
+
+    monkeypatch.setattr(storage_utils, "save_user_data", save_single_user_to_db)
     monkeypatch.setattr(storage_utils, "load_discounts_data", storage_utils.load_discounts_data_from_db)
     monkeypatch.setattr(storage_utils, "save_discounts_data", storage_utils.save_discounts_data_to_db)
+
+    import endpoints.hotel_manager_endpoint as hotel_routes
+
+    monkeypatch.setattr(hotel_routes, "load_parking_lot_data", storage_utils.load_parking_lot_data_from_db)
+    monkeypatch.setattr(hotel_routes, "get_discount_by_code", storage_utils.get_discount_by_code)
+    monkeypatch.setattr(hotel_routes, "save_new_discount_to_db", storage_utils.save_new_discount_to_db)
+    monkeypatch.setattr(
+        hotel_routes, "load_discounts_data_from_db", storage_utils.load_discounts_data_from_db
+    )
+    monkeypatch.setattr(
+        hotel_routes, "update_existing_discount_in_db", storage_utils.update_existing_discount_in_db
+    )
+
+    try:
+        import endpoints.auth as auth_routes
+
+        monkeypatch.setattr(auth_routes, "save_user_data", save_single_user_to_db)
+        monkeypatch.setattr(auth_routes, "load_user_data", storage_utils.load_user_data_from_db)
+    except ImportError:
+        pass
 
     from main import app
 
@@ -210,10 +247,3 @@ def user_token(test_db):
     user = {"id": "user-test-id", "username": "regular_user", "role": "USER", "name": "Regular User"}
     add_session(token, user)
     return token
-
-
-@pytest.fixture
-def cleanup_sessions():
-    """automatically clean up sessions after each test"""
-    yield
-    sessions.clear()

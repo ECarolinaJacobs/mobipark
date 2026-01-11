@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime, timedelta
+import uuid
 
 
 class TestAdminCreatesHotelManager:
@@ -7,11 +8,13 @@ class TestAdminCreatesHotelManager:
 
     def test_admin_can_create_hotel_manager(self, client, admin_token):
         """test admin successfully creates a hotel manager"""
+        unique_id = uuid.uuid4().hex[:8]
+        username = f"new_hotel_mgr_{unique_id}"
         response = client.post(
             "/auth/register/hotel-manager",
             headers={"Authorization": admin_token},
             json={
-                "username": "new_hotel_mgr",
+                "username": username,
                 "name": "New Hotel Manager",
                 "password": "securepass123",
                 "parking_lot_id": "1",
@@ -19,10 +22,12 @@ class TestAdminCreatesHotelManager:
                 "phone": "111222333",
             },
         )
+        print(f"Status: {response.status_code}")
+        print(f"Response: {response.json()}")  # This will show the validation error
         assert response.status_code == 200
         data = response.json()
         assert "Hotel manager" in data["message"]
-        assert data["username"] == "new_hotel_mgr"
+        assert data["username"] == username
         assert data["managed_parking_lot_id"] == "1"
 
     def test_admin_create_hotel_manager_invalid_parking_lot(self, client, admin_token):
@@ -86,13 +91,14 @@ class TestHotelManagerCreateDiscountCodes:
 
     def test_hotel_manager_creates_discount_code(self, client, hotel_manager_token):
         """test hotel manager can create a 100% discount code"""
+        unique_id = uuid.uuid4().hex[:8]
         check_in = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         check_out = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
         response = client.post(
             "/hotel-manager/discount-codes",
             headers={"Authorization": hotel_manager_token},
             json={
-                "code": "GUEST-SMITH-2024",
+                "code": f"GUEST-SMITH-{unique_id}",
                 "check_in_date": check_in,
                 "check_out_date": check_out,
                 "guest_name": "Mr. Smith",
@@ -101,7 +107,7 @@ class TestHotelManagerCreateDiscountCodes:
         )
         assert response.status_code == 201
         data = response.json()
-        assert data["code"] == "GUEST-SMITH-2024"
+        assert data["code"] == f"GUEST-SMITH-{unique_id}"
         assert data["discount_value"] == 100.0
         assert data["discount_type"] == "percentage"
         assert data["parking_lot_id"] == "1"
@@ -115,16 +121,21 @@ class TestHotelManagerCreateDiscountCodes:
 
     def test_hotel_manager_creates_code_with_minimal_data(self, client, hotel_manager_token):
         """test creating discount code with only required fields"""
+        unique_id = uuid.uuid4().hex[:8]
         check_in = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         check_out = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
         response = client.post(
             "/hotel-manager/discount-codes",
             headers={"Authorization": hotel_manager_token},
-            json={"code": "MINIMAL-CODE", "check_in_date": check_in, "check_out_date": check_out},
+            json={
+                "code": f"MINIMAL-CODE-{unique_id}",
+                "check_in_date": check_in,
+                "check_out_date": check_out,
+            },
         )
         assert response.status_code == 201
         data = response.json()
-        assert data["code"] == "MINIMAL-CODE"
+        assert data["code"] == f"MINIMAL-CODE-{unique_id}"
         assert data["discount_value"] == 100.0
         assert data["check_in_date"] == check_in
         assert data["check_out_date"] == check_out
@@ -310,6 +321,10 @@ class TestHotelManagerViewParkingLot:
 
     def test_hotel_manager_views_managed_parking_lot(self, client, hotel_manager_token):
         """test hotel manager can view their assigned parking lot"""
+        from utils import storage_utils
+
+        print(f"DB_PATH in test: {storage_utils.DB_PATH}")
+
         response = client.get(
             "/hotel-manager/managed-parking-lot", headers={"Authorization": hotel_manager_token}
         )
@@ -332,13 +347,15 @@ class TestCompleteHotelManagerWorkflow:
     def test_complete_workflow(self, client, admin_token):
         """test complete workflow from hotel manager creation to discount code usage"""
         # admin creates hotel manager
+        unique_id = uuid.uuid4().hex[:8]
+        username = f"workflow_test_mgr_{unique_id}"
         check_in = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         check_out = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
         response = client.post(
             "/auth/register/hotel-manager",
             headers={"Authorization": admin_token},
             json={
-                "username": "workflow_test_mgr",
+                "username": username,
                 "name": "Workflow Test Manager",
                 "password": "admin123",
                 "parking_lot_id": "2",
@@ -348,7 +365,7 @@ class TestCompleteHotelManagerWorkflow:
         assert response.status_code == 200
         assert response.json()["managed_parking_lot_id"] == "2"
         # hotel manager logs in
-        response = client.post("/auth/login", json={"username": "workflow_test_mgr", "password": "admin123"})
+        response = client.post("/auth/login", json={"username": username, "password": "admin123"})
         assert response.status_code == 200
         hotel_token = response.json()["session_token"]
 
