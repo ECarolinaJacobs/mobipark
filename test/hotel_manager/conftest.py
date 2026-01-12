@@ -141,7 +141,7 @@ def test_db():
     # Insert a test discount code created by hotel manager
     cursor.execute(
         """
-        INSERT INTO discounts VALUES 
+        INSERT INTO discounts VALUES
         ('EXISTING-CODE', 'percentage', 100.0, 1, 0, 1, '1704067200',
          '2026-01-10', '2026-01-15', '1', 'hotel_mgr_test', 'John Doe',
          'Test guest', 1)
@@ -184,8 +184,20 @@ def client(test_db, monkeypatch):
     monkeypatch.setattr(storage_utils, "load_parking_lot_data", storage_utils.load_parking_lot_data_from_db)
     monkeypatch.setattr(storage_utils, "load_user_data", storage_utils.load_user_data_from_db)
 
-    def save_single_user_to_db(user_data):
-        storage_utils.insert_single_json_to_db("users", user_data)
+    def save_single_user_to_db(users_dict):
+        """save only the new added user to the database"""
+        if isinstance(users_dict, dict):
+            if users_dict:
+                user_id = list(users_dict.keys())[-1]
+                user_data = users_dict[user_id]
+                storage_utils.insert_single_json_to_db("users", user_data)
+        elif isinstance(users_dict, list):
+            if users_dict:
+                storage_utils.insert_single_json_to_db("users", users_dict[-1])
+        else:
+            storage_utils.insert_single_json_to_db("users", users_dict)
+
+    monkeypatch.setattr(storage_utils, "save_user_data", save_single_user_to_db)
 
     monkeypatch.setattr(storage_utils, "save_user_data", save_single_user_to_db)
     monkeypatch.setattr(storage_utils, "load_discounts_data", storage_utils.load_discounts_data_from_db)

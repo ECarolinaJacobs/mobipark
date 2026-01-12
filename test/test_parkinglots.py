@@ -1,7 +1,6 @@
 import pytest
 import requests
 import json
-from utils.storage_utils import load_parking_lot_data
 from test.test_utils import (
     create_user,
     delete_user,
@@ -12,6 +11,7 @@ from test.test_utils import (
     delete_parking_session,
     url,
     create_random_dutch_plate,
+    load_parking_lots_from_mock,
 )
 
 # TODO: TEST EDGE CASES
@@ -212,12 +212,19 @@ def test_update_parking_lot():
         headers=headers,
     )
 
-    parking_lots = load_parking_lot_data()
+    parking_lots = load_parking_lots_from_mock()
 
     key_to_update = None
-    for k, v in parking_lots.items():
-        if v.get("name") == "TEST_PARKING_LOT":
-            key_to_update = k
+    if isinstance(parking_lots, dict):
+        for k, v in parking_lots.items():
+            if v["name"] == "TEST_PARKING_LOT":
+                key_to_update = k
+                break
+    elif isinstance(parking_lots, list):
+        for lot in parking_lots:
+            if lot["name"] == "TEST_PARKING_LOT":
+                key_to_update = lot.get("id")
+                break
 
     res = requests.put(
         f"{url}/parking-lots/{key_to_update}", json={"location": "Tilted Towers"}, headers=headers
