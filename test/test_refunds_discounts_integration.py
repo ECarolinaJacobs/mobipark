@@ -2,7 +2,7 @@ import pytest
 import requests
 from datetime import datetime, timedelta
 import uuid
-import test_utils
+import test.test_utils
 
 BASE_URL = "http://localhost:8000/"
 
@@ -35,7 +35,7 @@ def login(role: str = "user"):
     else:
         res = requests.post(f"{BASE_URL}register", json=ADMIN_REGISTER)
         # Promote to admin after registration
-        test_utils.update_user_role("admin", "ADMIN")
+        test.test_utils.update_user_role("admin", "ADMIN")
     """Login and return authorization headers"""
     credentials = USER_LOGIN if role == "user" else ADMIN_LOGIN
     res = requests.post(url=f"{BASE_URL}login", json=credentials)
