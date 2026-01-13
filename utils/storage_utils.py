@@ -1043,3 +1043,4 @@ def get_user_by_id(user_id) -> Optional[Dict]:
                 return user
         return None
     return load_single_json_from_db("users", "id", user_id)
+

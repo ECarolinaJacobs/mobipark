@@ -11,9 +11,12 @@ from endpoints.reservations import router as reservations_router
 from endpoints.vehicles_endpoint import router as vehicle_router
 from utils.storage_utils import init_db
 from dotenv import load_dotenv
-load_dotenv()
+from scripts.insert_hash import start
 
+
+load_dotenv()
 init_db()
+start()
 app = FastAPI()
 
 # This is auth router imported from endpoints

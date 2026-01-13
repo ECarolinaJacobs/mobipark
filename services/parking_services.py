@@ -88,7 +88,7 @@ def update_parking_session(
     if parking_lot_id not in parking_lots:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not find parking lot")
 
-    parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
+    parking_sessions = storage_utils.get_sessions_data_by_id(parking_lot_id)
     if parking_session_id not in parking_sessions:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not find parking session")
 
@@ -114,7 +114,7 @@ def start_parking_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not find parking lot")
     if parking_lots[parking_lot_id]["reserved"] >= parking_lots[parking_lot_id]["capacity"]:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Parking lot is full")
-    parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
+    parking_sessions = storage_utils.get_sessions_data_by_id(parking_lot_id)
     for key, session in parking_sessions.items():
         if session["licenseplate"] == session_data.licenseplate:
             raise HTTPException(
@@ -160,7 +160,7 @@ def stop_parking_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not find parking lot")
 
     updated_parking_session_entry = None
-    parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
+    parking_sessions = storage_utils.get_sessions_data_by_id(parking_lot_id)
     reservation = find_reservation_by_license_plate(parking_lot_id, session_data.licenseplate)
 
     for key, session in parking_sessions.items():
@@ -252,7 +252,7 @@ def delete_parking_lot(parking_lot_id: str):
 
 
 def delete_parking_session(parking_session_id: str, parking_lot_id: str):
-    parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
+    parking_sessions = storage_utils.get_sessions_data_by_id(parking_lot_id)
 
     if parking_session_id not in parking_sessions:
         raise HTTPException(
@@ -271,7 +271,7 @@ def delete_parking_session(parking_session_id: str, parking_lot_id: str):
 def get_parking_session(
     parking_lot_id: str, session_user: Dict[str, str] = Depends(auth_services.require_auth)
 ):
-    parking_sessions = storage_utils.load_parking_session_data(parking_lot_id)
+    parking_sessions = storage_utils.get_sessions_data_by_id(parking_lot_id)
     user_sessions = {}
 
     if session_user.get("role") != "ADMIN":
