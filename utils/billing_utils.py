@@ -7,25 +7,11 @@ from utils.storage_utils import (
 )
 from utils.session_calculator import generate_payment_hash
 
-
 def get_user_session_by_username(username: str) -> List[Dict]:
-    sessions: List[Dict] = []
-
-    parking_lots = load_parking_lot_data() or []
-
-    for lot in parking_lots:
-        lot_id = lot.get("id")
-        if not lot_id:
-            continue
-
-        lot_sessions = load_parking_sessions_data_from_db(lot_id) or {}
-
-        for session in lot_sessions.values():
-            if session.get("user") == username:
-                sessions.append(session)
-
+    all_sessions = load_parking_sessions_data_from_db() or []
+    
+    sessions = [s for s in all_sessions if s.get("user") == username]
     return sessions
-
 
 def format_billing_record(sessions: List[Dict]) -> List[Dict]:
     billing_data = []
@@ -33,9 +19,8 @@ def format_billing_record(sessions: List[Dict]) -> List[Dict]:
     parking_lots = load_parking_lot_data() or []
     payments = load_payment_data_from_db() or []
 
-    parking_lot_index = {
-        str(lot["id"]): lot for lot in parking_lots
-    }
+    lots_iterable = parking_lots.values() if isinstance(parking_lots, dict) else parking_lots
+    parking_lot_index = {str(lot.get("id")): lot for lot in lots_iterable}
 
     for session in sessions:
         parking_lot = parking_lot_index.get(str(session.get("parking_lot_id")))
@@ -54,7 +39,7 @@ def format_billing_record(sessions: List[Dict]) -> List[Dict]:
             if p.get("session_id") == session_id
         )
 
-        transaction_hash = generate_payment_hash(session_id, session)
+        transaction_hash = generate_payment_hash()
 
         billing_data.append({
             "session": {
