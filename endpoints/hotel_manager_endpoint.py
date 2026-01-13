@@ -22,7 +22,10 @@ ROLE_ADMIN = "ADMIN"
 
 
 def require_auth(request: Request) -> Dict[str, str]:
-    """Authentication dependency"""
+    """Authentication dependency
+    :param: request containing auth header
+    :return: dict with authenticated user's session data
+    """
     auth_token = request.headers.get("Authorization")
     if not auth_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization header")
@@ -35,7 +38,10 @@ def require_auth(request: Request) -> Dict[str, str]:
 
 
 def require_hotel_manager(request: Request) -> Dict[str, str]:
-    """Hotel manager authentication dependency"""
+    """Hotel manager authentication dependency
+    :param request: request obect with auth header
+    :return: dictionary with authenticated hotel manager's session data
+    """
     session_user = require_auth(request)
     if session_user["role"] != ROLE_HOTEL_MANAGER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hotel manager privileges required")
@@ -67,7 +73,11 @@ def create_hotel_discount_code(
     discount_create: HotelDiscountCodeCreate, session_user: Dict[str, str] = Depends(require_hotel_manager)
 ) -> JSONResponse:
     """hotel managers can create 100% discount codes for their guests,
-    these are only valid for the parking lots they manage"""
+    these are only valid for the parking lots they manage
+    :param discount_create: discount code creation data
+    :param session_user: authenticated hotel manager's session data
+    :return: jsonresponse with created discount code details
+    """
     try:
         parking_lots = load_parking_lot_data()
         managed_lot_id = session_user["managed_parking_lot_id"]
@@ -92,7 +102,8 @@ def create_hotel_discount_code(
         check_in = datetime.fromisoformat(discount_create.check_in_date)
         if check_in.date() < now.date():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Check-in date cannot be in the past"
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Check-in date cannot be in the past",
             )
 
         # build the hotel discount code object
@@ -142,7 +153,10 @@ def create_hotel_discount_code(
     response_description="List of hotel discount codes",
 )
 def get_hotel_discount_codes(session_user: Dict[str, str] = Depends(require_hotel_manager)) -> JSONResponse:
-    """returns all discount codes created by the authenticated hotel manager for their parking lot"""
+    """returns all discount codes created by the authenticated hotel manager for their parking lot
+    :param session_user: authenticated hotel manager's session data
+    :return: jsonResponse with list of discount codes created by this hotel manager
+    """
     try:
         all_discount_codes = load_discounts_data_from_db() or []
         hotel_codes = [
@@ -166,7 +180,11 @@ def get_hotel_discount_codes(session_user: Dict[str, str] = Depends(require_hote
 def get_hotel_discount_code_by_code(
     code: str, session_user: Dict[str, str] = Depends(require_hotel_manager)
 ) -> JSONResponse:
-    """returns details of a specific discount code if it was created by this hotel manager"""
+    """returns details of a specific discount code if it was created by this hotel manager
+    :param code: the discount code to retrieve
+    :param session_user: authenticated hotel manager's session data
+    :return: jsonResponse containing the discount code details
+    """
     try:
         discount_code = get_discount_by_code(code)
         if not discount_code:
@@ -196,7 +214,11 @@ def get_hotel_discount_code_by_code(
 def deactivate_hotel_discount_code(
     code: str, session_user: Dict[str, str] = Depends(require_hotel_manager)
 ) -> JSONResponse:
-    """deactivates a discount code created by this hotel manager"""
+    """deactivates a discount code created by this hotel manager
+    :param code: the discount code to deactivate
+    :param session_user: authenticated hotel manager's session data
+    :return: jsonResponse containing the updated discount code details
+    """
     try:
         existing_discount = get_discount_by_code(code)
         if not existing_discount:
@@ -234,7 +256,10 @@ def deactivate_hotel_discount_code(
     response_description="Parking lot details",
 )
 def get_managed_parking_lot(session_user: Dict[str, str] = Depends(require_hotel_manager)) -> JSONResponse:
-    """returns details of the parking lot assigned to this hotel manager"""
+    """returns details of the parking lot assigned to this hotel manager
+    :param session_user: authenticated hotel manager's session data
+    :return: jsonResponse containing the managed parking lot details with id included
+    """
     try:
         parking_lots = load_parking_lot_data()
         managed_lot_id = session_user["managed_parking_lot_id"]

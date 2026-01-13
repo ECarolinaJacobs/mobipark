@@ -341,7 +341,7 @@ class TestGetVehicleHistory:
     @patch("endpoints.vehicles_endpoint.get_session")
     @patch("endpoints.vehicles_endpoint.find_vehicle_by_license_plate")
     @patch("utils.storage_utils.load_parking_lot_data")
-    @patch("utils.storage_utils.load_parking_session_data")
+    @patch("endpoints.vehicles_endpoint.load_parking_sessions_data_from_db")
     def test_get_own_vehicle_history(self, mock_load_sessions, mock_load_lots, mock_find, mock_session):
         mock_session.return_value = MOCK_USER
         mock_find.return_value = MOCK_VEHICLE.copy()
@@ -391,7 +391,7 @@ class TestGetVehicleHistory:
     @patch("endpoints.vehicles_endpoint.get_session")
     @patch("endpoints.vehicles_endpoint.find_vehicle_by_license_plate")
     @patch("utils.storage_utils.load_parking_lot_data")
-    @patch("utils.storage_utils.load_parking_session_data")
+    @patch("endpoints.vehicles_endpoint.load_parking_sessions_data_from_db")
     def test_get_vehicle_history_admin_access(
         self, mock_load_sessions, mock_load_lots, mock_find, mock_session
     ):

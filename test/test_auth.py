@@ -2,20 +2,29 @@ import pytest
 import requests
 import random
 import string
-import uuid
 
 url = "http://localhost:8000"
 
 
 @pytest.fixture
 def test_user():
-    unique_id = uuid.uuid4().hex[:8]
-    return {"username": f"edgeuser_{unique_id}", "password": "edgepass123", "name": "Edge testperson9"}
+    return {"username": "Testing edgeuserruh", "password": "edgepass123", "name": "Edge testpersonnuh"}
+
+
+def random_username(length=8):
+    letters = string.ascii_lowercase
+    digits = string.digits
+    return "".join(random.choices(letters + digits, k=length))
+
+
+@pytest.fixture
+def new_test_user():
+    return {"username": random_username(), "password": "anotherpass", "name": "Another User"}
 
 
 # tests if a new user can register successfully and receives a session token, and an Authorization header.
-def test_register_user(test_user):
-    res = requests.post(f"{url}/auth/register", json=test_user)
+def test_register_user(new_test_user):
+    res = requests.post(f"{url}/register", json=new_test_user)
     assert res.status_code == 200
     data = res.json()
     assert "session_token" in data
@@ -32,9 +41,8 @@ def test_register_existing_user(test_user):
 
 # Confirms that a registered user can log in and gets a valid session token and Authorization header.
 def test_login_user(test_user):
-    requests.post(f"{url}/auth/register", json=test_user)
     login_data = {"username": test_user["username"], "password": test_user["password"]}
-    res = requests.post(f"{url}/auth/login", json=login_data)
+    res = requests.post(f"{url}/login", json=login_data)
     assert res.status_code == 200
     data = res.json()
     assert "session_token" in data
@@ -122,7 +130,7 @@ def test_register_long_username():
 
 
 # this test checks that usernames that have special characters
-# are rejected with a 400 status code.
+# are not rejected with a 400 status code.
 def test_register_with_special_chars():
     special_user = {"username": "user.name-test_01", "password": "password123", "name": "Special User"}
     res = requests.post(f"{url}/register", json=special_user)

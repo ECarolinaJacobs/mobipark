@@ -16,7 +16,7 @@ from scripts.insert_hash import start
 
 load_dotenv()
 init_db()
-start()
+# start()
 app = FastAPI()
 
 # This is auth router imported from endpoints
