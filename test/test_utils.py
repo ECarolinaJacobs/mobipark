@@ -119,3 +119,11 @@ def create_random_dutch_plate():
         lambda: f"{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{random.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}-{random.randint(10, 99)}",
     ]
     return random.choice(patterns)()
+
+
+def load_parking_lots_from_mock():
+    filename = "../data/parking-lots.son"
+    if use_mock_data:
+        filename = MOCK_PARKING_LOTS
+    with open(filename, "r") as f:
+        return json.load(f)

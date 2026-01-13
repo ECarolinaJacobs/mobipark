@@ -2,7 +2,7 @@ import pytest
 import requests
 from datetime import datetime
 from utils import storage_utils
-import test_utils
+import test.test_utils
 import uuid
 from urllib.parse import quote  # <--- NEW IMPORT
 
@@ -42,7 +42,7 @@ def login(role: str = "user"):
     else:
         res = requests.post(f"{BASE_URL}register", json=ADMIN_REGISTER)
         # Promote to admin after registration
-        test_utils.update_user_role("admin", "ADMIN")
+        test.test_utils.update_user_role("admin", "ADMIN")
 
     """Login and return authorization headers"""
     credentials = USER_LOGIN if role == "user" else ADMIN_LOGIN
