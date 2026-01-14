@@ -10,13 +10,15 @@ from dotenv import load_dotenv
 load_dotenv()
 use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
 MOCK_PARKING_LOTS = (Path(__file__).parent.parent / "mock_data/mock_parking-lots.json").resolve()
-MOCK_PARKING_SESSIONS = (Path(__file__).parent.parent / "mock_data/mock_parkingsessions.json").resolve()
+MOCK_PARKING_SESSIONS = (Path(__file__).parent.parent / "mock_data/pdata/mock_parkingsessions.json").resolve()
 MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolve()
 MOCK_RESERVATIONS = (Path(__file__).parent.parent / "mock_data/mock_reservations.json").resolve()
 MOCK_PAYMENTS = (Path(__file__).parent.parent / "mock_data/mock_payments.json").resolve()
+MOCK_BILLING = (Path(__file__).parent.parent / "mock_data/mock_billing.json").resolve()
 MOCK_DISCOUNTS = (Path(__file__).parent.parent / "mock_data/mock_discounts.json").resolve()
 MOCK_REFUNDS = (Path(__file__).parent.parent / "mock_data/mock_refunds.json").resolve()
 MOCK_VEHICLES = (Path(__file__).parent.parent / "mock_data/mock_vehicles.json").resolve()
+
 
 # Define the database path globally
 # Check for test database path first (for pytest)
@@ -466,6 +468,22 @@ def get_user_data_by_username(username: str) -> Optional[Dict]:
         return None
     return load_single_json_from_db("users", key_col="username", key_val=username)
 
+def update_existing_user_in_db(username: str, user_data: Dict):
+    if use_mock_data:
+        users = load_data(MOCK_USERS)
+        for user in users:
+            if user.get("username") == username:
+                user.update(user_data)
+                save_data(MOCK_USERS, users)
+                return
+        raise ValueError("User not found")
+    
+    update_single_json_in_db(
+        "users", 
+        key_col="username", 
+        key_val=username, 
+        update_item=user_data
+    )
 
 # --- Parking Lots ---
 def load_parking_lot_data_from_db():
@@ -820,16 +838,17 @@ def save_parking_lot_data(data):
     return save_parking_lot_data_to_db(data)
 
 
-def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate="TEST-PLATE"):
-    filename = f"./data/pdata/p{parking_lot_id}-sessions.json"
-    if use_mock_data:
-        filename = MOCK_PARKING_SESSIONS
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
+# def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate="TEST-PLATE"):
+#     filename = f"./data/pdata/p{parking_lot_id}-sessions.json"
+#     if use_mock_data:
+#         filename = MOCK_PARKING_SESSIONS
+#     with open(filename, "r") as f:
+#         parking_lots = json.load(f)
 
-    for k, v in parking_lots.items():
-        if v.get("licenseplate") == licenseplate:
-            return k
+#     for k, v in parking_lots.items():
+#         if v.get("licenseplate") == licenseplate:
+#             return k
+    #verander dit naar db , wordt gebruikt in parkingservice bij stop parking session
 
 
 def load_reservation_data():
@@ -884,18 +903,18 @@ def save_refunds_data(data):
         return
     save_json_to_db("refunds", data)
 
+# def save_parking_session_data(data, lid):
+#     if use_mock_data:
+#         save_data(MOCK_PARKING_SESSIONS, data)
+#         return
+#     save_data(f"data/pdata/p{lid}-sessions.json", data)
+# is vervangt door save_parking_session_data_to_db beneden
 
-def save_parking_session_data(data, lid):
-    if use_mock_data:
-        save_data(MOCK_PARKING_SESSIONS, data)
-        return
-    save_data(f"data/pdata/p{lid}-sessions.json", data)
-
-
-def load_parking_session_data(lid):
-    if use_mock_data:
-        return load_data(MOCK_PARKING_SESSIONS)
-    return load_data(f"data/pdata/p{lid}-sessions.json")
+# def load_parking_session_data(lid):
+#     if use_mock_data:
+#          return load_data(MOCK_PARKING_SESSIONS)
+#     return load_data(f"data/pdata/p{lid}-sessions.json")
+# word niet eens gebruikt?
 
 
 # vehicles
@@ -1023,17 +1042,21 @@ def load_parking_sessions_data_from_db():
         return load_data(MOCK_PARKING_SESSIONS)
     return load_json_from_db("parking_sessions")
 
+# Get all parking sessions for a specific parking lot ID
+def get_sessions_data_by_id(parking_lot_id: str) -> Dict[str, Dict]:
+    try:
+        sessions = load_parking_sessions_data_from_db()
+    except Exception:
+        return {}
 
-def get_sessions_data_by_id(session_id: str) -> Optional[Dict]:
-    if use_mock_data:
-        sessions = load_data(MOCK_PARKING_SESSIONS)
-        for session in sessions:
-            if session.get("id") == session_id:
-                return session
-        return None
-    return load_single_json_from_db(
-        "sessions", key_col="id", key_val=session_id
-    )
+    filtered_sessions = [
+        s for s in sessions
+        if s.get("parking_lot_id") == str(parking_lot_id)
+    ]
+
+    return {s.get("id"): s for s in filtered_sessions}
+
+
 
 def get_user_by_id(user_id) -> Optional[Dict]:
     if use_mock_data:
@@ -1044,3 +1067,78 @@ def get_user_by_id(user_id) -> Optional[Dict]:
         return None
     return load_single_json_from_db("users", "id", user_id)
 
+def save_parking_session_data(data: Dict[str, Dict], parking_lot_id: str):
+    if use_mock_data:
+        try:
+            sessions = load_data(MOCK_PARKING_SESSIONS) or []
+        except Exception:
+            sessions = []
+
+        # Merge or replace by id into the centrale list
+        for sid, session in (data or {}).items():
+            session_obj = dict(session)
+            session_obj["id"] = sid
+            session_obj["parking_lot_id"] = str(parking_lot_id)
+
+            found = False
+            for i, s in enumerate(sessions):
+                if s.get("id") == sid:
+                    sessions[i] = session_obj
+                    found = True
+                    break
+            if not found:
+                sessions.append(session_obj)
+
+        save_data(MOCK_PARKING_SESSIONS, sessions)
+        return
+
+    for sid, session in (data or {}).items():
+        session_obj = dict(session)
+        session_obj["id"] = sid
+        session_obj["parking_lot_id"] = parking_lot_id
+        save_parking_session_data_to_db(session_obj)
+
+
+def save_parking_session_data_to_db(data):
+    if use_mock_data:
+        parking_sessions = load_data(MOCK_PARKING_SESSIONS)
+        session_id = data.get("id")
+        
+        #if it exists, just update 
+        for i, session in enumerate(parking_sessions):
+            if session.get("id") == session_id:
+                parking_sessions[i] = data  
+                save_data(MOCK_PARKING_SESSIONS, parking_sessions)
+                return
+            
+        # else, append new
+        parking_sessions.append(data)
+        save_data(MOCK_PARKING_SESSIONS, parking_sessions)
+        return
+    
+    try:
+        update_single_json_in_db("parking_sessions", "id", data.get("id"), data)
+    except ValueError:
+        insert_single_json_to_db("parking_sessions", data)
+
+# find a parking session ID by parking lot and license plate
+def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str = "TEST-PLATE") -> Optional[str]:
+    if use_mock_data:
+        sessions = load_data(MOCK_PARKING_SESSIONS)
+        for session in sessions:
+            if (
+                session.get("parking_lot_id") == parking_lot_id
+                and session.get("licenseplate") == licenseplate
+            ):
+                return session.get("id")
+        return None
+    
+    all_sessions = load_json_from_db("parking_sessions")
+    for session in all_sessions:
+        if (
+            session.get("parking_lot_id") == parking_lot_id
+            and session.get("licenseplate") == licenseplate
+        ):
+            return session.get("id")
+    
+    return None

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Header, HTTPException, status
-from utils.session_manager import get_session, add_session
-from utils.storage_utils import load_user_data, save_user_data
+from utils.session_manager import get_session
+from utils.storage_utils import (
+    get_user_data_by_username,
+    update_existing_user_in_db
+)
 from utils.passwords import hash_password_bcrypt
-from models.profile_model import ProfileUpdateRequest
-from models.profile_model import ProfileResponse
+from models.profile_model import ProfileUpdateRequest, ProfileResponse
 
 
 router = APIRouter()
@@ -54,18 +56,14 @@ def update_profile(
             detail="Invalid session token"
         )
 
-    users = load_user_data()
-    user = next(
-        (u for u in users if u["id"] == session_user["id"]),
-        None
-    )
-
+    user = get_user_data_by_username(session_user["username"]) 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
 
+    # Update user fields if they aree provided
     if update_data.name is not None:
         user["name"] = update_data.name
         session_user["name"] = update_data.name
@@ -86,6 +84,17 @@ def update_profile(
         user["password"] = hash_password_bcrypt(update_data.password)
         user["hash_type"] = "bcrypt"
 
-    save_user_data(users)
+    try:
+        update_existing_user_in_db(session_user["username"], user)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update profile: {str(e)}"
+        )
 
     return {"message": "Profile updated successfully"}

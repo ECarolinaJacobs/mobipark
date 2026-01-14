@@ -10,7 +10,6 @@ from utils.storage_utils import (
     save_parking_lot_data,
     load_parking_lot_data,
     save_parking_session_data,
-    load_parking_session_data
 )
 
 router = APIRouter(
