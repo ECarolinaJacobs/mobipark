@@ -13,7 +13,8 @@ from utils.storage_utils import (
     save_new_payment_to_db, 
     update_existing_payment_in_db,
     get_discount_by_code,
-    update_existing_discount_in_db
+    update_existing_discount_in_db,
+    get_payments_by_initiator
 )
 from models.payments_model import PaymentCreate, PaymentUpdate
 from utils.session_calculator import (
@@ -106,31 +107,22 @@ def get_payment_by_id(
 def get_all_payments(
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
-    # This endpoint still needs to load ALL payments for filtering/admin view
     try:
-        payments = load_payment_data_from_db() or []
+        # Admins see all payments
+        if session_user["role"] == ROLE_ADMIN:
+            payments = load_payment_data_from_db() or []
+            return JSONResponse(content=payments, status_code=status.HTTP_200_OK)
+        
+        # Regular users see only their own payments - Optimized DB query
+        user_payments = get_payments_by_initiator(session_user["username"]) or []
+        return JSONResponse(content=user_payments, status_code=status.HTTP_200_OK)
+        
     except Exception as e:
         logger.error(f"Failed to load payment data: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load payment data"
         )
-    
-    # Admins see all payments
-    if session_user["role"] == ROLE_ADMIN:
-        return JSONResponse(content=payments, status_code=status.HTTP_200_OK)
-    
-    # Regular users see only their own payments
-    # NOTE: For further optimization, a SQL 'WHERE' clause could be added
-    # in storage_utils to filter in the DB before load, but we keep the current
-    # list comprehension logic for now as it's simple and load_payment_data_from_db
-    # is already optimized to not load all rows into memory at once (via cursor iteration).
-    user_payments = [
-        p for p in payments 
-        if p["initiator"] == session_user["username"]
-    ]
-    
-    return JSONResponse(content=user_payments, status_code=status.HTTP_200_OK)
 
 
 @router.post(

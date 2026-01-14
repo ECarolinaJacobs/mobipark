@@ -48,3 +48,4 @@ def check_payment_amount(hash):
             total += payment["amount"]
 
     return total
+

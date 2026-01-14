@@ -1,0 +1,78 @@
+[
+  {
+    "session": {
+      "license_plate": "AB-12-CD",
+      "started": "2026-01-10T10:00:00",
+      "stopped": "2026-01-10T14:30:00",
+      "hours": 4.5,
+      "days": 0
+    },
+    "parking": {
+      "name": "Central Parking",
+      "location": "Downtown",
+      "tariff": 3.5,
+      "daytariff": 25.0
+    },
+    "amount": 15.75,
+    "thash": "abc123hash",
+    "payed": 15.75,
+    "balance": 0.0
+  },
+  {
+    "session": {
+      "license_plate": "XY-99-ZZ",
+      "started": "2026-01-11T08:00:00",
+      "stopped": "2026-01-11T18:00:00",
+      "hours": 10.0,
+      "days": 0
+    },
+    "parking": {
+      "name": "Airport Parking",
+      "location": "Airport",
+      "tariff": 5.0,
+      "daytariff": 40.0
+    },
+    "amount": 50.0,
+    "thash": "def456hash",
+    "payed": 30.0,
+    "balance": 20.0
+  },
+  {
+    "session": {
+      "license_plate": "AB-12-CD",
+      "started": "2026-01-12T09:00:00",
+      "stopped": "2026-01-14T09:00:00",
+      "hours": 48.0,
+      "days": 2
+    },
+    "parking": {
+      "name": "Long-term Parking",
+      "location": "City Center",
+      "tariff": 2.5,
+      "daytariff": 20.0
+    },
+    "amount": 40.0,
+    "thash": "ghi789hash",
+    "payed": 0.0,
+    "balance": 40.0
+  },
+  {
+    "session": {
+      "license_plate": "KL-55-MN",
+      "started": "2026-01-13T12:00:00",
+      "stopped": null,
+      "hours": 0.0,
+      "days": 0
+    },
+    "parking": {
+      "name": "Shopping Mall Parking",
+      "location": "Mall District",
+      "tariff": 4.0,
+      "daytariff": 30.0
+    },
+    "amount": 0.0,
+    "thash": "jkl012hash",
+    "payed": 0.0,
+    "balance": 0.0
+  }
+]

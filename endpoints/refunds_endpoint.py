@@ -17,7 +17,8 @@ from utils.storage_utils import (
     get_discount_by_code,
     save_new_discount_to_db,
     load_discounts_data_from_db,
-    update_existing_discount_in_db
+    update_existing_discount_in_db,
+    get_refunds_for_user
 )
 from models.refunds_model import (
     RefundCreate, 
@@ -203,19 +204,13 @@ def get_all_refunds(
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
     try:
-        refunds = load_refunds_data_from_db() or []
-        
         # Admins see all refunds
         if session_user["role"] == ROLE_ADMIN:
+            refunds = load_refunds_data_from_db() or []
             return JSONResponse(content=refunds, status_code=status.HTTP_200_OK)
         
-        # Regular users see only refunds for their own payments
-        user_refunds = []
-        for refund in refunds:
-            original_payment = get_payment_data_by_id(refund["original_transaction_id"])
-            if original_payment and original_payment["initiator"] == session_user["username"]:
-                user_refunds.append(refund)
-        
+        # Regular users see only refunds for their own payments using JOIN
+        user_refunds = get_refunds_for_user(session_user["username"])
         return JSONResponse(content=user_refunds, status_code=status.HTTP_200_OK)
     
     except Exception as e:

@@ -3,6 +3,11 @@ import pytest
 import time
 import random
 import string
+from dotenv import load_dotenv
+import os
+from test.test_utils import update_user_role
+
+load_dotenv()
 
 url = "http://localhost:8000/"
 
@@ -23,7 +28,6 @@ def register_login(username="vehicle_user", password="123", name=None, role="USE
     if res.status_code == 400 and "Username already exists" in res.text:
         login_data = {"username": username, "password": password}
         res = requests.post(f"{url}/auth/login", json=login_data)
-
     assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
     token = res.json().get("session_token")
     assert token, f"No token received from auth response: {res.text}"
@@ -34,8 +38,16 @@ def register_admin(username="admin_user", password="123", name="Admin"):
     name = name or username
     register_data = {"username": username, "password": password, "name": name}
     res = requests.post(f"{url}/auth/register", json=register_data)
+
     if res.status_code == 400 and "Username already exists" in res.text:
+        # User already exists, update role and login
+        update_user_role(username, "ADMIN")
         res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
+    else:
+        # New user - update role then re-login to get new session with ADMIN role
+        update_user_role(username, "ADMIN")
+        res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
+
     assert res.status_code in (200, 201), f"Auth failed for {username}: {res.text}"
     token = res.json().get("session_token")
     assert token, f"No token received from auth response: {res.text}"
@@ -342,43 +354,103 @@ def test_admin_view_user_vehicles():
 # added test for get/vehicles/{license_plate}/reservations
 # test passed if reservation is sent back, returns 200
 def test_get_vehicle_reservations():
+    headers = register_admin("admin_user", "123", "Admin")
     headers = register_login("res_user", "123")
-    data = {
+    unique_plate = valid_plate()
+    vehicle_data = {
         "user_id": "test",
-        "license_plate": "RR-10-CD",
+        "license_plate": unique_plate,
         "make": "Renault",
         "model": "Clio",
         "color": "Blue",
         "year": 2019,
     }
-    requests.post(f"{url}/vehicles", json=data, headers=headers)
-    lid = "RR10CD"
+    vehicle_res = requests.post(f"{url}/vehicles", json=vehicle_data, headers=headers)
+    assert vehicle_res.status_code == 200
+    vehicle_id = vehicle_res.json()["id"]
+    reservation_data = {
+        "vehicle_id": vehicle_id,
+        "start_time": "2025-12-20T10:00:00:00Z",
+        "end_time": "2025-12-20T14:00:00Z",
+        "parking_lot_id": "1",
+    }
+    res_create = requests.post(f"{url}/reservations/", json=reservation_data, headers=headers)
+    lid = unique_plate.replace("-", "").upper()
     res = requests.get(f"{url}/vehicles/{lid}/reservations", headers=headers)
-    assert res.status_code == 200
     body = res.json()
     assert "reservations" in body
     assert isinstance(body["reservations"], list)
+    if res_create.status_code == 201:
+        assert len(body["reservations"]) > 0
+        assert body["reservations"][0]["vehicle_id"] == vehicle_id
 
 
 # added test get/vehicles/{license_plate}/history
 # test passed if vehicles history is returned (200)
 def test_get_vehicle_history():
-    headers = register_login("hist_user", "123")
-    data = {
+    user_headers = register_login("history_integration_user", "123")
+    vehicle_plate = valid_plate()
+    vehicle_data = {
         "user_id": "test",
-        "license_plate": "HH-20-CD",
-        "make": "Renault",
-        "model": "Clio",
-        "color": "Blue",
-        "year": 2019,
+        "license_plate": vehicle_plate,
+        "make": "Toyota",
+        "model": "Camry",
+        "color": "Silver",
+        "year": 2023,
     }
-    requests.post(f"{url}/vehicles", json=data, headers=headers)
-    lid = "HH20CD"
-    res = requests.get(f"{url}/vehicles/{lid}/history", headers=headers)
-    assert res.status_code == 200
-    body = res.json()
+    create_vehicle_res = requests.post(f"{url}/vehicles", json=vehicle_data, headers=user_headers)
+    assert create_vehicle_res.status_code == 200
+    # get parking lot
+    lots_res = requests.get(f"{url}/parking-lots/")
+    assert lots_res.status_code == 200
+    lots = lots_res.json()
+    assert len(lots) > 0, "No parking lots available for this test"
+    lot_id = list(lots.keys())[0]
+    # start parking session
+    session_data = {"licenseplate": vehicle_plate}
+    start_res = requests.post(
+        f"{url}/parking-lots/{lot_id}/sessions/start", json=session_data, headers=user_headers
+    )
+    print("START SESSION:", start_res.status_code, start_res.text)
+    print("Sent headers:", user_headers)
+    print("Sent session_data:", session_data)
+
+    assert start_res.status_code == 200
+    time.sleep(2)
+    stop_res = requests.put(
+        f"{url}/parking-lots/{lot_id}/sessions/stop", json=session_data, headers=user_headers
+    )
+    assert stop_res.status_code == 200
+    stopped_session = stop_res.json()
+    assert stopped_session["stopped"] is not None
+    assert stopped_session["duration_minutes"] >= 0
+    assert stopped_session["cost"] >= 0
+    assert stopped_session["payment_status"] == "Pending"
+    lid = vehicle_plate.replace("-", "").upper()
+    history_res = requests.get(f"{url}/vehicles/{lid}/history", headers=user_headers)
+    assert history_res.status_code == 200
+    body = history_res.json()
     assert "history" in body
     assert isinstance(body["history"], list)
+    history = body["history"]
+    assert len(history) >= 1, "Expected at least one completed session in history"
+    found_session = None
+    for session in history:
+        if session["licenseplate"] == vehicle_plate:
+            found_session = session
+            break
+    assert found_session is not None, f"Could not find session for vehicle {vehicle_plate}"
+    assert found_session["licenseplate"] == vehicle_plate
+    assert found_session["started"] is not None
+    assert found_session["stopped"] is not None
+    assert found_session["user"] == "history_integration_user"
+    assert found_session["duration_minutes"] >= 0
+    assert found_session["cost"] >= 0
+    assert found_session["payment_status"] == "Pending"
+    assert found_session["parking_lot_id"] == lot_id
+    assert found_session["parking_lot_name"] == lots[lot_id]["name"]
+    assert found_session["parking_lot_address"] == lots[lot_id]["address"]
+    assert "session_id" in found_session
 
 
 # test passed if creating a vehicle with an empty or whitespace-only name is rejected (400 or 422)
