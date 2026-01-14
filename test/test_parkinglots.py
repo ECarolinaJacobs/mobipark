@@ -13,6 +13,7 @@ from test.test_utils import (
     create_random_dutch_plate,
     load_parking_lots_from_mock,
 )
+from utils import storage_utils
 
 # TODO: TEST EDGE CASES
 
@@ -212,19 +213,12 @@ def test_update_parking_lot():
         headers=headers,
     )
 
-    parking_lots = load_parking_lots_from_mock()
+    parking_lots = storage_utils.load_parking_lot_data()
 
     key_to_update = None
-    if isinstance(parking_lots, dict):
-        for k, v in parking_lots.items():
-            if v["name"] == "TEST_PARKING_LOT":
-                key_to_update = k
-                break
-    elif isinstance(parking_lots, list):
-        for lot in parking_lots:
-            if lot["name"] == "TEST_PARKING_LOT":
-                key_to_update = lot.get("id")
-                break
+    for lot in parking_lots:
+        if lot.get("name") == "TEST_PARKING_LOT":
+            key_to_update = lot.get("id")
 
     res = requests.put(
         f"{url}/parking-lots/{key_to_update}", json={"location": "Tilted Towers"}, headers=headers

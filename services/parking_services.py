@@ -29,11 +29,12 @@ def create_parking_lot(
 
     new_id = None
     if parking_lots:
-        new_id = str(max(int(k) for k in parking_lots.keys()) + 1)
+        new_id = str(len(parking_lots) + 1)
     else:
         new_id = "1"
 
     parking_lot_entry = {
+        "id": new_id,
         "name": parking_lot.name,
         "location": parking_lot.location,
         "address": parking_lot.address,
@@ -46,22 +47,26 @@ def create_parking_lot(
     }
 
     try:
-        parking_lots[new_id] = parking_lot_entry
+        parking_lots.append(parking_lot_entry)
         storage_utils.save_parking_lot_data(parking_lots)
-    except Exception:
+    except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save parking lot"
         )
 
-    return parking_lots[new_id]
+    return parking_lot_entry
 
 
 def update_parking_lot(parking_lot_id: str, parking_lot_update: UpdateParkingLot):
     parking_lots = storage_utils.load_parking_lot_data()
-    if parking_lot_id not in parking_lots:
+
+    parking_lot = next(
+        (lot for lot in parking_lots if lot.get("id") == parking_lot_id),
+        None)
+    if parking_lot is None:
         raise HTTPException(404, "Parking lot not found")
 
-    parking_lot = parking_lots[parking_lot_id]
     update_data = parking_lot_update.model_dump(exclude_unset=True)
 
     if "coordinates" in update_data:
@@ -77,7 +82,7 @@ def update_parking_lot(parking_lot_id: str, parking_lot_update: UpdateParkingLot
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update parking lot"
         )
 
-    return parking_lots[parking_lot_id]
+    return parking_lot
 
 
 def update_parking_session(
@@ -237,17 +242,20 @@ def stop_parking_session(
 def delete_parking_lot(parking_lot_id: str):
     parking_lots = storage_utils.load_parking_lot_data()
 
+    for lot in parking_lots:
+        if lot.get("id") == parking_lot_id:
+            parking_lots.remove(lot)
+            try:
+                storage_utils.save_parking_lot_data(parking_lots)
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete parking lot"
+                )
+            return
+
     if parking_lot_id not in parking_lots:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Not Found - Resource does not exist"
-        )
-
-    parking_lots.pop(parking_lot_id)
-    try:
-        storage_utils.save_parking_lot_data(parking_lots)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete parking lot"
         )
 
 
