@@ -1,11 +1,12 @@
-import sqlite3
+# import sqlite3
 import bcrypt
 from utils.storage_utils import DB_PATH
+from utils.storage_utils import get_db_connection
 
 
 def start():
     # Connect to the configured database file
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     print(f"Database connection succeeded: {DB_PATH}")
 

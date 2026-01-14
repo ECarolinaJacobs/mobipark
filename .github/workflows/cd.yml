@@ -27,6 +27,8 @@ jobs:
             --name mobipark-api \
             -p 8000:8000 \
             -e USE_MOCK_DATA=false \
+            -e USE_DB_ENCRYPTION=true \
+            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
             -v /home/ubuntu-1057198/mobipark-data:/workspace/data \
             --restart unless-stopped \
             mobipark-api:latest

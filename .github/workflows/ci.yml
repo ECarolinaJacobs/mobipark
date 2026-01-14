@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       USE_MOCK_DATA: true
+      USE_DB_ENCRYPTION: false
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
     strategy:
       fail-fast: false
       matrix:
