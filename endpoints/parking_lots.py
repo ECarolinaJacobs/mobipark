@@ -28,12 +28,15 @@ router = APIRouter(
 )
 def get_parking_lot_by_id(parking_lot_id: str):
     parking_lots = load_parking_lot_data()
-    if parking_lot_id not in parking_lots:
+    lot = next((lot for lot in parking_lots if lot.get("id") == parking_lot_id),
+        None)
+    if lot is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Parking lot does not exist"
         )
-    return parking_lots[parking_lot_id]
+    
+    return lot
 
 @router.get(
     "/parking-lots/",
