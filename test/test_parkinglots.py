@@ -45,9 +45,39 @@ def test_create_parking_lot():
 
 
 def test_start_and_stop_session():
-    parking_lot_id = 1
+    delete_parking_lot()
+    create_user(True, "test_admin", "test")
+    headers = get_session("test_admin", "test")
+    lot_res = requests.post(
+        f"{url}/parking-lots/",
+        json={
+            "name": "TEST_PARKING_LOT",
+            "location": "TEST_LOCATION",
+            "address": "TEST_ADDRESS",
+            "capacity": 10,
+            "reserved": 0,
+            "tariff": 2.50,
+            "daytariff": 20.00,
+            "created_at": "2025-12-12",
+            "coordinates": {"lat": 40.712776, "lng": -74.005974},
+        },
+        headers=headers,
+    )
+
+    assert lot_res.status_code == 200
+
+    token = headers["Authorization"]
+    requests.post(
+        f"{url}/logout",
+        json={
+            "token": token
+        }
+    )
+    delete_user()
+
+    parking_lot_id = lot_res.json()["id"]
     unique_plate = create_random_dutch_plate()
-    delete_parking_session(parking_lot_id, unique_plate)
+
     create_user(False)
     headers = get_session()
 
@@ -383,10 +413,33 @@ def test_get_all_parking_lots():
 
 
 def test_get_parking_lot():
-    parking_lot_id = 1
+    create_user(True)
+    headers = get_session()
+    res = requests.post(
+        f"{url}/parking-lots/",
+        json={
+            "name": "TEST_PARKING_LOT",
+            "location": "TEST_LOCATION",
+            "address": "TEST_ADDRESS",
+            "capacity": 10,
+            "reserved": 0,
+            "tariff": 2.50,
+            "daytariff": 20.00,
+            "created_at": "2025-12-12",
+            "coordinates": {"lat": 40.712776, "lng": -74.005974},
+        },
+        headers=headers,
+    )
+
+    assert res.status_code == 200
+    created_lot = res.json()
+    parking_lot_id = created_lot["id"]
+
     res = requests.get(f"{url}/parking-lots/{parking_lot_id}")
 
     assert res.status_code == 200
+    delete_parking_lot()
+    delete_user()
 
 
 def test_get_sessions_admin():

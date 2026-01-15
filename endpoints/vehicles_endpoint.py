@@ -210,19 +210,19 @@ def get_vehicle_history(license_plate: str, authorization: Optional[str] = Heade
     completed_sessions = []
     normalized_plate = normalize_plate(license_plate)
     sessions = load_parking_sessions_data_from_db()
-    for session_id, session_data in sessions.items():
+    for session in sessions:
         if (
-            normalize_plate(session_data.get("licenseplate", "")) == normalized_plate
-            and session_data.get("stopped") is not None
+            normalize_plate(session.get("licenseplate", "")) == normalized_plate
+            and session.get("stopped") is not None
         ):
-            lot_id = session_data.get("parking_lot_id")
+            lot_id = session.get("parking_lot_id")
             lot_data = parking_lots.get(lot_id, {}) if lot_id else {}
             session_with_context = {
-                "session_id": session_id,
+                "session_id": session["id"],
                 "parking_lot_id": lot_id,
                 "parking_lot_name": lot_data.get("name"),
                 "parking_lot_address": lot_data.get("address"),
-                **session_data,
+                **session,
             }
             completed_sessions.append(session_with_context)
     completed_sessions.sort(key=lambda x: x.get("stopped", ""), reverse=True)

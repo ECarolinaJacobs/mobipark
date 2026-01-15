@@ -119,13 +119,16 @@ def create_reservation(
     except Exception as e:
         logging.error(f"Unexpected error when loading data: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data")
-    if reservation_data.parking_lot_id not in parking_lots:
+    
+    parking_lot = next((lot for lot in parking_lots if lot.get("id") == reservation_data.parking_lot_id), None)
+
+    if parking_lot is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parking lot not found")
     if reservation_data.start_time >= reservation_data.end_time:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="end_time must be after start_time"
         )
-    parking_lot = parking_lots[reservation_data.parking_lot_id]
+
     if parking_lot["reserved"] >= parking_lot["capacity"]:
         earliest_available = find_earliest_available_time(reservation_data.parking_lot_id, reservations)
         if earliest_available:
@@ -162,8 +165,7 @@ def create_reservation(
 
     reservations.append(reservation_data_dict)
 
-    parking_lot_id = reservation_data.parking_lot_id
-    parking_lots[parking_lot_id]["reserved"] += 1
+    parking_lot["reserved"] += 1
 
     try:
         save_reservation_data(reservations)

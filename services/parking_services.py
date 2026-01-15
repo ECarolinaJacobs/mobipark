@@ -29,7 +29,7 @@ def create_parking_lot(
 
     new_id = None
     if parking_lots:
-        new_id = str(len(parking_lots) + 1)
+        new_id = str(max(int(lot["id"]) for lot in parking_lots) + 1)
     else:
         new_id = "1"
 
@@ -115,43 +115,66 @@ def start_parking_session(
     session_user: Dict[str, str] = Depends(auth_services.require_auth),
 ):
     parking_lots = storage_utils.load_parking_lot_data()
-    if parking_lot_id not in parking_lots:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Could not find parking lot")
-    if parking_lots[parking_lot_id]["reserved"] >= parking_lots[parking_lot_id]["capacity"]:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Parking lot is full")
-    parking_sessions = storage_utils.get_sessions_data_by_id(parking_lot_id)
-    for key, session in parking_sessions.items():
-        if session["licenseplate"] == session_data.licenseplate:
+    parking_lot = next((lot for lot in parking_lots if lot.get("id") == parking_lot_id), 
+        None)
+    if parking_lot is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Could not find parking lot",
+        )
+    if parking_lot["reserved"] >= parking_lot["capacity"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Parking lot is full",
+        )
+
+    parking_sessions = storage_utils.load_parking_session_data()
+    for session in parking_sessions:
+        if session.get("licenseplate") == session_data.licenseplate:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="A session for this license plate already exists"
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A session for this license plate already exists",
             )
+
     reservation = find_reservation_by_license_plate(parking_lot_id, session_data.licenseplate)
     if reservation:
         start_time = reservation.get("start_time")
     else:
-        start_time = datetime.now().replace(microsecond=0).isoformat(timespec="minutes").replace("+00:00", "")
-    new_id = None
+        start_time = (
+            datetime.now()
+            .replace(microsecond=0)
+            .isoformat(timespec="minutes")
+            .replace("+00:00", "")
+        )
+
     if parking_sessions:
-        new_id = str(max(int(k) for k in parking_sessions.keys()) + 1)
+        new_id = str(max(int(session.get("id", 0)) for session in parking_sessions) + 1)
     else:
         new_id = "1"
+
     parking_session_entry = {
+        "id": new_id,
         "licenseplate": session_data.licenseplate,
         "started": start_time,
         "stopped": None,
         "user": session_user.get("username"),
         "has_reservation": reservation is not None,
     }
+
     try:
-        parking_sessions[new_id] = parking_session_entry
-        storage_utils.save_parking_session_data(parking_sessions, parking_lot_id)
-        parking_lots[parking_lot_id]["reserved"] += 1
+        parking_sessions.append(parking_session_entry)
+        storage_utils.save_parking_session_data(parking_sessions)
+        parking_lot["reserved"] += 1
         storage_utils.save_parking_lot_data(parking_lots)
-    except Exception:
+
+    except Exception as e:
+        print(e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save parking session"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save parking session",
         )
-    return parking_sessions[new_id]
+
+    return parking_session_entry
 
 
 def stop_parking_session(
