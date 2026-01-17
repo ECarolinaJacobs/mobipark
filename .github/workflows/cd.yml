@@ -11,18 +11,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Wait for Docker to be ready
+        run: |
+          for i in {1..30}; do
+            if docker info > /dev/null 2>&1; then
+              echo "Docker is ready!"
+              break
+            fi
+            echo "Waiting for Docker..."
+            sleep 2
+          done
+      
       - name: Build Docker image
         run: |
-          sudo docker build -t mobipark-api:latest .
+          docker build -t mobipark-api:latest .
       
       - name: Stop and remove old container
         run: |
-          sudo docker stop mobipark-api || true
-          sudo docker rm mobipark-api || true
+          docker stop mobipark-api || true
+          docker rm mobipark-api || true
       
       - name: Start new container
         run: |
-          sudo docker run -d \
+          docker run -d \
             --name mobipark-api \
             -p 8000:8000 \
             -e USE_MOCK_DATA=false \
@@ -35,5 +46,5 @@ jobs:
       - name: Verify deployment
         run: |
           sleep 10
-          sudo docker ps | grep mobipark-api
+          docker ps | grep mobipark-api
           curl -f http://localhost:8000/ || echo "API check completed"
