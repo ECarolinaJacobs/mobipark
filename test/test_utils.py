@@ -25,20 +25,27 @@ def create_user(isAdmin, username="test", password="test"):
 
 
 def update_user_role(username, role):
-    filename = "../data/users.json"
     if use_mock_data:
         filename = MOCK_USERS
-    with open(filename, "r") as f:
-        users = json.load(f)
-    if not isinstance(users, list):
-        print(f"Warning: users file is not a list, its a {type(users)}. Converting...")
-        users = [users] if users else []
+        with open(filename, "r") as f:
+            users = json.load(f)
+        if not isinstance(users, list):
+            print(f"Warning: users file is not a list, its a {type(users)}. Converting...")
+            users = [users] if users else []
+        for user in users:
+            if user.get("username") == username:
+                user["role"] = role
+                break
+        with open(filename, "w") as f:
+            json.dump(users, f, indent=2)
+        return
+    
+    users = storage_utils.load_user_data()
     for user in users:
         if user.get("username") == username:
             user["role"] = role
             break
-    with open(filename, "w") as f:
-        json.dump(users, f, indent=2)
+    storage_utils.save_user_data(users)
 
 
 def delete_user(username="test"):
@@ -56,20 +63,26 @@ def delete_user(username="test"):
 
 
 def delete_parking_lot(name="TEST_PARKING_LOT"):
-    filename = "../data/parking-lots.json"
     if use_mock_data:
         filename = MOCK_PARKING_LOTS
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
+        with open(filename, "r") as f:
+            parking_lots = json.load(f)
 
-    new_parking_lots = {k: v for k, v in parking_lots.items() if v.get("name") != name}
+        new_parking_lots = [lot for lot in parking_lots if lot.get("name") != name]
 
-    with open(filename, "w") as f:
-        json.dump(new_parking_lots, f)
+        with open(filename, "w") as f:
+            json.dump(new_parking_lots, f)
+        return
+
+    parking_lots = storage_utils.load_parking_lot_data()
+    for lot in parking_lots:
+        if lot.get("name") == name:
+            parking_lots.remove(lot)
+            break
+    storage_utils.save_parking_lot_data(parking_lots)
 
 
-def delete_parking_session(parking_lot_id: str, license_plate="TEST-PLATE"):
-    filename = f"../data/pdata/p{parking_lot_id}-sessions.json"
+def delete_parking_session(session_id, parking_lot_id: str, license_plate="TEST-PLATE"):
     if use_mock_data:
         filename = MOCK_PARKING_SESSIONS
         with open(filename, "r") as f:
@@ -79,24 +92,24 @@ def delete_parking_session(parking_lot_id: str, license_plate="TEST-PLATE"):
         with open(filename, "w") as f:
             json.dump(sessions, f, indent=2)
         return
-    with open(filename, "r") as f:
-        sessions = json.load(f)
-    new_parking_sessions = {k: v for k, v in sessions.items() if v.get("licenseplate") != license_plate}
-    with open(filename, "w") as f:
-        json.dump(new_parking_sessions, f)
-
+    storage_utils.delete_parking_session_from_db(session_id)
+    
 
 def find_parking_lot_id_by_name():
-    filename = "../data/parking-lots.json"
     if use_mock_data:
         filename = MOCK_PARKING_LOTS
-    with open(filename, "r") as f:
-        parking_lots = json.load(f)
+        with open(filename, "r") as f:
+            parking_lots = json.load(f)
 
-    for k, v in parking_lots.items():
-        if v.get("name") == "TEST_PARKING_LOT":
-            return k
-
+        for lot in parking_lots:
+            if lot.get("name") == "TEST_PARKING_LOT":
+                return lot.get("id")
+        return
+            
+    lots = storage_utils.load_parking_lot_data()
+    for lot in lots:
+        if lot.get("name") == "TEST_PARKING_LOT":
+            return lot.get("id")
 
 def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str):
     filename = f"../data/pdata/p{parking_lot_id}-sessions.json"

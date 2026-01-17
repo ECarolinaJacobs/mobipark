@@ -1067,59 +1067,79 @@ def get_user_by_id(user_id) -> Optional[Dict]:
         return None
     return load_single_json_from_db("users", "id", user_id)
 
-def save_parking_session_data(data: Dict[str, Dict], parking_lot_id: str):
+
+def save_parking_session_data(data):
     if use_mock_data:
-        try:
-            sessions = load_data(MOCK_PARKING_SESSIONS) or []
-        except Exception:
-            sessions = []
-
-        # Merge or replace by id into the centrale list
-        for sid, session in (data or {}).items():
-            session_obj = dict(session)
-            session_obj["id"] = sid
-            session_obj["parking_lot_id"] = str(parking_lot_id)
-
-            found = False
-            for i, s in enumerate(sessions):
-                if s.get("id") == sid:
-                    sessions[i] = session_obj
-                    found = True
-                    break
-            if not found:
-                sessions.append(session_obj)
-
-        save_data(MOCK_PARKING_SESSIONS, sessions)
+        save_data(MOCK_PARKING_SESSIONS, data)
         return
+    return save_parking_session_data_to_db(data)
 
-    for sid, session in (data or {}).items():
-        session_obj = dict(session)
-        session_obj["id"] = sid
-        session_obj["parking_lot_id"] = parking_lot_id
-        save_parking_session_data_to_db(session_obj)
+
+def load_parking_session_data():
+    if use_mock_data:
+        return load_data(MOCK_PARKING_SESSIONS)
+    return load_parking_sessions_data_from_db()
+
+
+# def save_parking_session_data(data: Dict[str, Dict], parking_lot_id: str):
+#     if use_mock_data:
+#         try:
+#             sessions = load_data(MOCK_PARKING_SESSIONS) or []
+#         except Exception:
+#             sessions = []
+
+#         # Merge or replace by id into the centrale list
+#         for sid, session in (data or {}).items():
+#             session_obj = dict(session)
+#             session_obj["id"] = sid
+#             session_obj["parking_lot_id"] = str(parking_lot_id)
+
+#             found = False
+#             for i, s in enumerate(sessions):
+#                 if s.get("id") == sid:
+#                     sessions[i] = session_obj
+#                     found = True
+#                     break
+#             if not found:
+#                 sessions.append(session_obj)
+
+#         save_data(MOCK_PARKING_SESSIONS, sessions)
+#         return
+
+#     for sid, session in (data or {}).items():
+#         session_obj = dict(session)
+#         session_obj["id"] = sid
+#         session_obj["parking_lot_id"] = parking_lot_id
+#         save_parking_session_data_to_db(session_obj)
+
+
+def save_vehicle_data_to_db(data):
+    if use_mock_data:
+        vehicles = load_data(MOCK_VEHICLES)
+        vehicles.append(data)
+        return save_data(MOCK_VEHICLES, vehicles)
+    insert_single_json_to_db("vehicles", data)
 
 
 def save_parking_session_data_to_db(data):
     if use_mock_data:
         parking_sessions = load_data(MOCK_PARKING_SESSIONS)
-        session_id = data.get("id")
-        
-        #if it exists, just update 
-        for i, session in enumerate(parking_sessions):
-            if session.get("id") == session_id:
-                parking_sessions[i] = data  
-                save_data(MOCK_PARKING_SESSIONS, parking_sessions)
-                return
-            
-        # else, append new
         parking_sessions.append(data)
-        save_data(MOCK_PARKING_SESSIONS, parking_sessions)
-        return
-    
+        return save_data(MOCK_PARKING_SESSIONS, data)
+    save_json_to_db("parking_sessions", data)
+
+
+def delete_parking_session_from_db(session_id: str):
     try:
-        update_single_json_in_db("parking_sessions", "id", data.get("id"), data)
-    except ValueError:
-        insert_single_json_to_db("parking_sessions", data)
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM parking_sessions WHERE id == ?", (session_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    except sqlite3.OperationalError as e:
+        print(f"Error deleting session: {e}")
+        return False
+
 
 # find a parking session ID by parking lot and license plate
 def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str = "TEST-PLATE") -> Optional[str]:
