@@ -111,16 +111,20 @@ def create_reservation(
 ) -> JSONResponse:
 
     try:
-    
+
         reservations = load_reservation_data()
         parking_lots = load_parking_lot_data()
         if parking_lots is None or reservations is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data"
+            )
     except Exception as e:
         logging.error(f"Unexpected error when loading data: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data")
-    
-    parking_lot = next((lot for lot in parking_lots if lot.get("id") == reservation_data.parking_lot_id), None)
+
+    parking_lot = next(
+        (lot for lot in parking_lots if lot.get("id") == reservation_data.parking_lot_id), None
+    )
 
     if parking_lot is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parking lot not found")
@@ -186,7 +190,9 @@ def get_reservation_by_id(reservation_id: str, session_user: Dict[str, str] = De
     try:
         reservations = load_reservation_data()
         if reservations is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data"
+            )
     except Exception as e:
         logging.error(f"Unexpected error when loading reservation data: {e}")
         raise HTTPException(
@@ -217,7 +223,9 @@ def update_reservation(
         reservations = load_reservation_data()
         parking_lots = load_parking_lot_data()
         if parking_lots is None or reservations is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data"
+            )
     except Exception as e:
         logging.error(f"Unexpected error when loading data: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data")
@@ -228,7 +236,8 @@ def update_reservation(
         if reservation_data.start_time and reservation_data.end_time:
             if reservation_data.start_time >= reservation_data.end_time:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="end_time must be after start_time"
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="end_time must be after start_time",
                 )
         old_reservation = reservations[reservation_index]
         if not session_user.get("role") == ADMIN and not session_user["username"] == old_reservation.get(
@@ -255,7 +264,6 @@ def update_reservation(
         else:
             reservation_data.user_id = session_user["username"]
 
-
         old_parking_lot_id = old_reservation.get("parking_lot_id")
         new_parking_lot_id = reservation_data.parking_lot_id
 
@@ -267,11 +275,9 @@ def update_reservation(
         if old_parking_lot_id != new_parking_lot_id:
             # Find old parking lot
             old_parking_lot = next((lot for lot in parking_lots if lot.get("id") == old_parking_lot_id), None)
-            
+
             if old_parking_lot:
-                old_parking_lot["reserved"] = max(
-                    0, old_parking_lot["reserved"] - 1
-                )
+                old_parking_lot["reserved"] = max(0, old_parking_lot["reserved"] - 1)
 
             new_parking_lot["reserved"] += 1
 
@@ -302,7 +308,9 @@ def delete_reservation(reservation_id: str, session_user: Dict[str, str] = Depen
         reservations = load_reservation_data()
         parking_lots = load_parking_lot_data()
         if parking_lots is None or reservations is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error loading data"
+            )
     except Exception as e:
         logging.error(f"Unexpected error when loading data: {e}")
         raise HTTPException(

@@ -2,13 +2,16 @@ from pydantic import BaseModel
 from datetime import date, datetime
 from typing import Optional
 
+
 class Coordinates(BaseModel):
     lat: float
     lng: float
 
+
 class UpdateCoordinates(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
+
 
 class ParkingLot(BaseModel):
     name: str
@@ -21,6 +24,7 @@ class ParkingLot(BaseModel):
     created_at: str
     coordinates: Coordinates
 
+
 class UpdateParkingLot(BaseModel):
     name: Optional[str] = None
     location: Optional[str] = None
@@ -32,8 +36,10 @@ class UpdateParkingLot(BaseModel):
     created_at: Optional[str] = None
     coordinates: Optional[Coordinates] = None
 
+
 class ParkingSessionCreate(BaseModel):
     licenseplate: str
+
 
 class UpdateParkingSessionOngoing(BaseModel):
     licenseplate: Optional[str] = None
