@@ -5,11 +5,11 @@ from typing import Optional
 
 class TData(BaseModel):
     """Nested transaction data"""
-    amount: Optional[float] = Field(None, ge=0)
-    date: Optional[str] = None
-    method: Optional[str] = None
-    issuer: Optional[str] = None
-    bank: Optional[str] = None
+    amount: Optional[float] = Field(None, ge=0, description="Transaction amount")
+    date: Optional[str] = Field(None, description="Transaction date string")
+    method: Optional[str] = Field(None, description="Payment method (e.g., 'ideal', 'creditcard')")
+    issuer: Optional[str] = Field(None, description="Card or bank issuer")
+    bank: Optional[str] = Field(None, description="Bank name")
 
     @field_validator('amount')
     @classmethod
@@ -24,15 +24,15 @@ class TData(BaseModel):
 
 class Payment(BaseModel):
     """Complete payment model matching your JSON structure"""
-    transaction: str
-    amount: float = Field(ge=0)
-    initiator: str
-    created_at: str  # Format: "14-07-2025 22:30:171752525017"
-    completed: str  # Format: "14-07-2025 22:30:171752525024"
-    hash: str
-    t_data: TData
-    session_id: str  # Stored as string in JSON
-    parking_lot_id: str  # Stored as string in JSON
+    transaction: str = Field(..., description="Unique transaction ID")
+    amount: float = Field(ge=0, description="Total payment amount")
+    initiator: str = Field(..., description="User who initiated the payment")
+    created_at: str = Field(..., description="Creation timestamp")
+    completed: str = Field(..., description="Completion timestamp")
+    hash: str = Field(..., description="Payment validation hash")
+    t_data: TData = Field(..., description="Nested transaction details")
+    session_id: str = Field(..., description="Associated parking session ID")
+    parking_lot_id: str = Field(..., description="Associated parking lot ID")
     original_amount: Optional[float] = Field(None, ge=0, description="Original amount before discount")
     discount_applied: Optional[str] = Field(None, description="Discount code applied")
     discount_amount: Optional[float] = Field(None, ge=0, description="Amount discounted")
@@ -50,11 +50,11 @@ class Payment(BaseModel):
 
 class PaymentCreate(BaseModel):
     """Model for creating a payment - only fields the user provides"""
-    amount: float = Field(ge=0)
-    session_id: int  # User sends as int, we convert to string
-    parking_lot_id: int  # User sends as int, we convert to string
-    t_data: TData
-    completed: Optional[str] = None
+    amount: float = Field(ge=0, description="Payment amount")
+    session_id: int = Field(..., description="Parking session ID")
+    parking_lot_id: int = Field(..., description="Parking lot ID")
+    t_data: TData = Field(..., description="Transaction details")
+    completed: Optional[str] = Field(None, description="Optional completion timestamp")
     discount_code: Optional[str] = Field(None, description="Optional discount code to apply")
 
     @field_validator('amount')
@@ -69,12 +69,12 @@ class PaymentCreate(BaseModel):
 
 
 class PaymentUpdate(BaseModel):
-    transaction: Optional[str] = None
-    amount: Optional[float] = Field(None, ge=0)
-    completed: Optional[str] = None
-    t_data: Optional[TData] = None
-    session_id: Optional[int] = None
-    parking_lot_id: Optional[int] = None
+    transaction: Optional[str] = Field(None, description="Transaction ID (immutable)")
+    amount: Optional[float] = Field(None, ge=0, description="New amount")
+    completed: Optional[str] = Field(None, description="New completion timestamp")
+    t_data: Optional[TData] = Field(None, description="Updated transaction details")
+    session_id: Optional[int] = Field(None, description="New session ID")
+    parking_lot_id: Optional[int] = Field(None, description="New parking lot ID")
 
     @field_validator('amount')
     @classmethod

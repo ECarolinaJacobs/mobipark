@@ -30,7 +30,18 @@ ROLE_ADMIN = "ADMIN"
 
 
 def require_auth(request: Request) -> Dict[str, str]:
-    # ... (Authentication remains the same)
+    """
+    Middleware-like dependency to ensure the user is authenticated.
+    
+    Checks the 'Authorization' header for a valid session token.
+    Returns the session user object if valid, raises HTTPException otherwise.
+    
+    Args:
+        request: The incoming HTTP request.
+        
+    Returns:
+        Dict[str, str]: The session user data.
+    """
     auth_token = request.headers.get("Authorization")
     
     if not auth_token:
@@ -63,14 +74,25 @@ router = APIRouter(
 @router.get(
     "/payments/{payment_id}",
     summary="Get a single payment by ID",
-    response_description="Payment details"
+    description="Retrieve detailed information about a specific payment transaction. Users can only access their own payments.",
+    response_description="Payment details object",
+    response_model=Dict,
+    status_code=status.HTTP_200_OK
 )
 def get_payment_by_id(
     payment_id: str,
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
+    """
+    Fetch a payment by its unique transaction ID.
+    
+    Logic:
+    1. Validates the user session.
+    2. Loads the payment from the database.
+    3. Enforces ownership check: User must be the 'initiator' OR an 'ADMIN'.
+    """
     try:
-        # OPTIMIZATION: Load only the single payment by ID
+        # OPTIMIZATION: Load only the single payment by ID to avoid reading the whole table
         payment = get_payment_data_by_id(payment_id)
     except Exception as e:
         logger.error(f"Failed to load payment data: {e}")
@@ -102,11 +124,21 @@ def get_payment_by_id(
 @router.get(
     "/payments",
     summary="Get all payments",
-    response_description="List of payments"
+    description="Retrieve a list of payments. Admins see all payments; regular users see only their own.",
+    response_description="List of payment objects",
+    response_model=List[Dict],
+    status_code=status.HTTP_200_OK
 )
 def get_all_payments(
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
+    """
+    Fetch all payments accessible to the current user.
+    
+    Logic:
+    1. If ADMIN: Load and return ALL payments.
+    2. If USER: Query only payments where 'initiator' matches username.
+    """
     try:
         # Admins see all payments
         if session_user["role"] == ROLE_ADMIN:
@@ -128,6 +160,7 @@ def get_all_payments(
 @router.post(
     "/payments",
     summary="Create a new payment",
+    description="Process a new payment transaction. Supports optional discount code application.",
     response_description="Created payment details",
     status_code=status.HTTP_201_CREATED
 )
@@ -135,26 +168,35 @@ def create_payment(
     payment_create: PaymentCreate,
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
+    """
+    Create a new payment record.
+    
+    Key Logic:
+    1. Validates input data (amounts, transaction details).
+    2. **Discount Logic:** Checks for `discount_code`. Validates existence, expiry, and limits. Calculates new total.
+    3. **Hash Generation:** Creates secure hashes (`transaction_hash`, `payment_hash`) for data integrity.
+    4. Persists the payment to the database.
+    """
     try:
-        # ... (Validation remains the same)
+        # Validate critical fields
         if not payment_create.t_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Transaction data (t_data) is required"
             )
-        if payment_create.amount < 0 or payment_create.t_data.amount < 0:
+        if payment_create.amount < 0 or (payment_create.t_data.amount is not None and payment_create.t_data.amount < 0):
+             # Note: t_data.amount is optional in model but logic implies it exists or we trust the outer amount
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Transaction/Tdata (amount) cannot be negative"
             )
-        
-        # Load existing payments section REMOVED. No need to load all data.
         
         # Get current timestamp
         now = datetime.now()
         timestamp = int(now.timestamp())
         
         # Generate hashes
+        # These hashes are used to ensure the transaction record hasn't been tampered with
         try:
             transaction_hash = generate_transaction_validation_hash()
             payment_hash = generate_payment_hash()
@@ -171,6 +213,7 @@ def create_payment(
         discount_applied = None
         discount_amount = 0.0
         
+        # If a discount code is provided, we attempt to validate and apply it
         if payment_create.discount_code:
             try:
                 discount = get_discount_by_code(payment_create.discount_code)
@@ -180,14 +223,14 @@ def create_payment(
                         detail=f"Discount code '{payment_create.discount_code}' not found"
                     )
                 
-                # Validate discount code
+                # Validate discount code status
                 if not discount.get("active", True):
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Discount code is not active"
                     )
                 
-                # Check expiration
+                # Check expiration date
                 if discount.get("expires_at"):
                     try:
                         expires_at = datetime.fromisoformat(discount["expires_at"])
@@ -197,7 +240,8 @@ def create_payment(
                                 detail="Discount code has expired"
                             )
                     except ValueError:
-                        # If date parsing fails, ignore expiration check
+                        # If date parsing fails, ignore expiration check (fail open safe? or fail closed?)
+                        # Current logic: ignore check if date is bad.
                         pass
                 
                 # Check usage limits
@@ -209,7 +253,7 @@ def create_payment(
                         detail="Discount code has reached its usage limit"
                     )
                 
-                # Apply discount
+                # Calculate discount amount
                 discount_type = discount["discount_type"]
                 discount_value = discount["discount_value"]
                 
@@ -221,7 +265,7 @@ def create_payment(
                 final_amount = max(0, original_amount - discount_amount)
                 discount_applied = payment_create.discount_code
                 
-                # Update discount usage count
+                # Update discount usage count in DB
                 updated_discount = discount.copy()
                 updated_discount["current_uses"] = current_uses + 1
                 update_existing_discount_in_db(payment_create.discount_code, updated_discount)
@@ -236,6 +280,7 @@ def create_payment(
                 )
 
         # Build the payment object
+        # Note: We convert session_id and parking_lot_id to strings for consistency with legacy JSON format
         payment = {
             "transaction": transaction_hash,
             "amount": final_amount,
@@ -287,13 +332,24 @@ def create_payment(
 @router.put(
     "/payments/{payment_id}",
     summary="Update an existing payment",
-    response_description="Updated payment details"
+    description="Update payment details. Only available to ADMIN users.",
+    response_description="Updated payment details",
+    status_code=status.HTTP_200_OK
 )
 def update_payment(
     payment_id: str,
     payment_update: PaymentUpdate,
     session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
+    """
+    Update a payment record.
+    
+    Logic:
+    1. Enforces ADMIN role.
+    2. Loads existing payment.
+    3. Merges new data (partial update).
+    4. Persists changes.
+    """
     try:
         # Check admin permission
         if session_user["role"] != ROLE_ADMIN:
@@ -360,6 +416,3 @@ def update_payment(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred"
         )
-
-# NOTE: The helper functions get_payment_by_transaction_id and filter_payments_by_user
-# are now redundant or can be simplified as their logic is integrated/moved to storage_utils.
