@@ -43,16 +43,16 @@ MOCK_VEHICLE = {
     "created_at": "2026-01-11T17:18:10.294276",
 }
 
-MOCK_PARKING_LOT = {"1": {"id": "1", "name": "TEST", "capacity": 300, "reserved": 109}}
+MOCK_PARKING_LOT = [{"id": "1", "name": "TEST", "capacity": 300, "reserved": 109}]
 
-MOCK_PARKING_LOT_FULL = {
-    "1": {
+MOCK_PARKING_LOT_FULL = [
+    {
         "id": "1",
         "name": "TEST",
         "capacity": 100,
         "reserved": 100,
     }
-}
+]
 
 
 
@@ -167,7 +167,9 @@ class TestCreateReservations:
         assert response_data["status"] == "Success"
 
         saved_parking_lots = mock_save_parking_data.call_args[0][0]
-        assert saved_parking_lots["1"]["reserved"] == 110
+        updated_lot = next((lot for lot in saved_parking_lots if lot["id"] == "1"), None)
+        assert updated_lot is not None
+        assert updated_lot["reserved"] == 110
         
         reservation = response_data["reservation"]
         assert "id" in reservation
@@ -209,7 +211,9 @@ class TestCreateReservations:
         assert response_data["status"] == "Success"
 
         saved_parking_lots = mock_save_parking_data.call_args[0][0]
-        assert saved_parking_lots["1"]["reserved"] == 110
+        updated_lot = next((lot for lot in saved_parking_lots if lot["id"] == "1"), None)
+        assert updated_lot is not None
+        assert updated_lot["reserved"] == 110
 
         reservation = response_data["reservation"]
         assert "id" in reservation
@@ -445,7 +449,9 @@ class TestCreateReservations:
         assert response_data["status"] == "Success"
 
         saved_parking_lots = mock_save_parking_data.call_args[0][0]
-        assert saved_parking_lots["1"]["reserved"] == 101
+        updated_lot = next((lot for lot in saved_parking_lots if lot["id"] == "1"), None)
+        assert updated_lot is not None
+        assert updated_lot["reserved"] == 101
 
         reservation = response_data["reservation"]
         assert "id" in reservation
@@ -518,7 +524,9 @@ class TestCreateReservations:
         assert response_data["status"] == "Success"
 
         saved_parking_lots = mock_save_parking_data.call_args[0][0]
-        assert saved_parking_lots["1"]["reserved"] == 101
+        updated_lot = next((lot for lot in saved_parking_lots if lot["id"] == "1"), None)
+        assert updated_lot is not None
+        assert updated_lot["reserved"] == 101
 
         reservation = response_data["reservation"]
         assert "id" in reservation
@@ -1053,20 +1061,20 @@ class TestUpdateReservations:
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = [MOCK_RESERVATION]
     
-        mock_load_parking_lot_data.return_value = {
-            "1": {
+        mock_load_parking_lot_data.return_value = [
+            {
                 "id": "1",
                 "name": "TEST_FULL",
                 "capacity": 100,
                 "reserved": 100,
             },
-            "2": {
+            {
                 "id": "2",
                 "name": "TEST_AVAILABLE",
                 "capacity": 300,
                 "reserved": 109
             }
-        }
+        ]
         updated_data = {
             "vehicle_id": "7abb4afe-cfb3-4b8a-bda3-3723a33ab144",
             "start_time": "2025-12-08T10:00",
@@ -1086,8 +1094,12 @@ class TestUpdateReservations:
         assert data["status"] == "Updated"
 
         saved_parking_lots = mock_save_parking_lot_data.call_args[0][0]
-        assert saved_parking_lots["1"]["reserved"] == 99
-        assert saved_parking_lots["2"]["reserved"] == 110
+        updated_lot = next((lot for lot in saved_parking_lots if lot["id"] == "1"), None)
+        assert updated_lot is not None
+        assert updated_lot["reserved"] == 99
+        updated_lot_2 = next((lot for lot in saved_parking_lots if lot["id"] == "2"), None)
+        assert updated_lot_2 is not None
+        assert updated_lot_2["reserved"] == 110
 
         mock_save_reservation_data.assert_called_once()
     
@@ -1142,7 +1154,9 @@ class TestDeleteReservations:
         assert data["status"] == "Deleted"
 
         saved_parking_lot_data = mock_save_parking_lot_data.call_args[0][0]
-        assert saved_parking_lot_data["1"]["reserved"] == 108
+        updated_lot = next((lot for lot in saved_parking_lot_data if lot["id"] == "1"), None)
+        assert updated_lot is not None
+        assert updated_lot["reserved"] == 108
 
         assert data["id"] == MOCK_RESERVATION["id"]
 
@@ -1179,7 +1193,9 @@ class TestDeleteReservations:
       
         args, _ = mock_save_parking_lot_data.call_args
         saved_parking_data = args[0]
-        assert saved_parking_data["1"]["reserved"] == 108
+        updated_lot = next((lot for lot in saved_parking_data if lot["id"] == "1"), None)
+        assert updated_lot is not None
+        assert updated_lot["reserved"] == 108
         
 
         mock_save_reservation_data.assert_called_once()

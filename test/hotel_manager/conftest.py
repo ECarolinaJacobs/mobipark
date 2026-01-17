@@ -172,12 +172,12 @@ def client(test_db, monkeypatch):
         from utils import storage_utils
         from pathlib import Path
 
-        storage_utils.DB_PATH = Path(test_db)
-        storage_utils.use_mock_data = False
+        # Use monkeypatch to ensure changes are reverted after the test
+        monkeypatch.setattr(storage_utils, "DB_PATH", Path(test_db))
+        monkeypatch.setattr(storage_utils, "use_mock_data", False)
     else:
         from utils import storage_utils
-
-        storage_utils.use_mock_data = False
+        monkeypatch.setattr(storage_utils, "use_mock_data", False)
 
     assert str(storage_utils.DB_PATH) == str(test_db), "DB_PATH not set correctly"
 

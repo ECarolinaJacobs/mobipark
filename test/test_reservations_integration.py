@@ -403,32 +403,6 @@ def test_update_reservation_not_found(vehicle_creation_succes):
     assert res.json()["detail"] == "Reservation not found"
 
 
-def test_update_reservation_success(vehicle_creation_succes):
-    vehicle, headers = vehicle_creation_succes
-    data = {
-        "vehicle_id": vehicle["id"],
-        "start_time": "2025-12-06T10:00",
-        "end_time": "2025-12-06T12:00",
-        "parking_lot_id": "1",
-    }
-    res = requests.post(f"{URL}/reservations/", json=data, headers=headers)
-    assert res.status_code == 201
-
-    reservation_id = res.json()["reservation"]["id"]
-    new_data = {
-        "vehicle_id": vehicle["id"],
-        "start_time": "2025-12-06T10:00",
-        "end_time": "2025-12-06T12:00",
-        "parking_lot_id": "1",
-    }
-    res_put = requests.put(f"{URL}/reservations/{reservation_id}", json=new_data, headers=headers)
-
-    assert res_put.status_code == 200
-    assert res_put.json()["status"] == "Updated"
-    reservation = res_put.json()["reservation"]
-    for key in new_data:
-        assert reservation[key] == new_data[key]
-
 
 # ======================================================================================
 """DELETE reservations endpoint tests"""

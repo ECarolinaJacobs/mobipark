@@ -259,16 +259,21 @@ def update_reservation(
         old_parking_lot_id = old_reservation.get("parking_lot_id")
         new_parking_lot_id = reservation_data.parking_lot_id
 
-        if new_parking_lot_id not in parking_lots:
+        # Find new parking lot
+        new_parking_lot = next((lot for lot in parking_lots if lot.get("id") == new_parking_lot_id), None)
+        if new_parking_lot is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="New parking lot not found")
 
         if old_parking_lot_id != new_parking_lot_id:
-            if old_parking_lot_id in parking_lots:
-                parking_lots[old_parking_lot_id]["reserved"] = max(
-                    0, parking_lots[old_parking_lot_id]["reserved"] - 1
+            # Find old parking lot
+            old_parking_lot = next((lot for lot in parking_lots if lot.get("id") == old_parking_lot_id), None)
+            
+            if old_parking_lot:
+                old_parking_lot["reserved"] = max(
+                    0, old_parking_lot["reserved"] - 1
                 )
 
-            parking_lots[new_parking_lot_id]["reserved"] += 1
+            new_parking_lot["reserved"] += 1
 
         updated_reservation_dict = reservation_data.model_dump()
         updated_reservation_dict["id"] = reservation_id
@@ -317,8 +322,11 @@ def delete_reservation(reservation_id: str, session_user: Dict[str, str] = Depen
 
         del reservations[reservation_index]
 
-        if pid in parking_lots:
-            parking_lots[pid]["reserved"] = max(0, parking_lots[pid]["reserved"] - 1)
+        # Find parking lot
+        parking_lot = next((lot for lot in parking_lots if lot.get("id") == pid), None)
+
+        if parking_lot:
+            parking_lot["reserved"] = max(0, parking_lot["reserved"] - 1)
         else:
             logging.warning(
                 f"Reservation {reservation_id} was deleted, but its parking lot {pid} was not found."

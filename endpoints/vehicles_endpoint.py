@@ -216,7 +216,7 @@ def get_vehicle_history(license_plate: str, authorization: Optional[str] = Heade
             and session.get("stopped") is not None
         ):
             lot_id = session.get("parking_lot_id")
-            lot_data = parking_lots.get(lot_id, {}) if lot_id else {}
+            lot_data = next((lot for lot in parking_lots if lot.get("id") == lot_id), {}) if lot_id else {}
             session_with_context = {
                 "session_id": session["id"],
                 "parking_lot_id": lot_id,
