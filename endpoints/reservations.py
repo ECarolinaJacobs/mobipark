@@ -123,9 +123,9 @@ def create_reservation(
 ) -> JSONResponse:
     """
     Create a reservation for a parking lot.
-    
+
     - **Users**: Can only create reservations for themselves.
-    - **Admins**: Must provide a `user_id` to create a reservation for a user.
+    - **Admins**: Must provide a user_id to create a reservation for a user.
     - **Validation**: Checks if the lot is full, if start time is before end time and if the required fields are implemented.
     """
     try:
