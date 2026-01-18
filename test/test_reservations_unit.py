@@ -61,6 +61,12 @@ class TestCreateReservations:
     @patch("endpoints.reservations.get_session")
     @patch("endpoints.reservations.load_parking_lot_data")
     def test_missing_auth(self, mock_load_parking_data, mock_get_session):
+        """
+        Test when missing authorization.
+
+        Validation:
+        When the session is not provided return a 401 code with Invalid or expired session token
+        """
 
         mock_get_session.return_value = None
         mock_load_parking_data.return_value = MOCK_PARKING_LOT
@@ -76,7 +82,12 @@ class TestCreateReservations:
     @patch("endpoints.reservations.get_session")
     @patch("endpoints.reservations.load_reservation_data")
     def test_unable_to_load_reservation_data_create(self, mock_load_reservation_data, mock_get_session):
+        """
+        Test unable to load reservation data when creating a reservation.
 
+        Validation:
+        When reservation data loading goes wrong return 500 code with detail error loading data.
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = None
         
@@ -92,7 +103,12 @@ class TestCreateReservations:
     @patch("endpoints.reservations.get_session")
     @patch("endpoints.reservations.load_parking_lot_data")
     def test_unable_to_load_parking_lot_data_create(self, mock_load_parking_lot_data, mock_get_session):
+        """
+        Test unable to load parking lot data when creating a reservation.
 
+        Validation:
+        When parking lot data loading goes wrong return 500 code with detail error loading data.
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_parking_lot_data.return_value = None
         
@@ -110,6 +126,12 @@ class TestCreateReservations:
     def test_load_reservation_data_exception_create(
         self, mock_load_reservation_data, mock_get_session
     ):
+        """
+        Test exception unable to load reservation data when creating a reservation.
+
+        Validation:
+        When reservation data is none return 500 code.
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.side_effect = Exception("Error loading data")
 
@@ -126,6 +148,12 @@ class TestCreateReservations:
     def test_load_parking_lot_data_exception_create(
         self, mock_load_parking_lot_data, mock_get_session
     ):
+        """
+        Test exception unable to load parking lot data when creating a reservation.
+
+        Validation:
+        When parking lot data is none return 500 code.
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_parking_lot_data.side_effect = Exception("Error loading data")
 
@@ -150,6 +178,9 @@ class TestCreateReservations:
         load_reservation_data,
         mock_get_session,
     ):
+        """
+        User can create a reservation.
+        """
 
         mock_get_session.return_value = MOCK_USER
         load_reservation_data.return_value = []
@@ -192,13 +223,15 @@ class TestCreateReservations:
         load_reservation_data,
         mock_get_session,
     ):
+        """
+        Admin can create a reservation.
+        """
 
         mock_get_session.return_value = MOCK_ADMIN
         load_reservation_data.return_value = []
         mock_load_parking_data.return_value = copy.deepcopy(MOCK_PARKING_LOT)
         mock_save_parking_data.return_value = []
     
-
         response = client.post(
             "/reservations/",
             json=MOCK_RESERVATION_ADMIN,
@@ -233,6 +266,7 @@ class TestCreateReservations:
         load_reservation_data.return_value = []
         mock_load_parking_data.return_value = copy.deepcopy(MOCK_PARKING_LOT)
 
+        #user_id is set to None, so that the admin doesnt have the required user_id anymore to create a reservation.
         copy_mock_reservation = copy.deepcopy(MOCK_RESERVATION_ADMIN)
         copy_mock_reservation["user_id"] = None
 
@@ -258,7 +292,11 @@ class TestCreateReservations:
         load_reservation_data,
         mock_get_session,
     ):
+        """ 
+        Try to create a reservation when the parking lot is full.
 
+        Validation: Reservation shouldn't be able to be created since the parking lot is full
+        """
         mock_get_session.return_value = MOCK_USER
         load_reservation_data.return_value = []
         mock_load_parking_data.return_value = copy.deepcopy(MOCK_PARKING_LOT_FULL)
@@ -286,6 +324,7 @@ class TestCreateReservations:
     def test_get_reservation_id_with_no_existing_reservations(
         self, mock_save_parking_lot_data,mock_load_parking_lot_data, mock_save_reservation_data, mock_load_reservation_data, mock_get_session
     ):
+        #Load reservation data is set to an empty array, so that it doesnt have any reservations
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = []
         mock_load_parking_lot_data.return_value = copy.deepcopy(MOCK_PARKING_LOT)
@@ -304,11 +343,12 @@ class TestCreateReservations:
 
     @patch("endpoints.reservations.get_session")
     @patch("endpoints.reservations.load_reservation_data")
-    def test_missing_parking_lot_id(self, mock_load_reservation_data, mock_get_session):
+    def test_parking_lot_id_not_found(self, mock_load_reservation_data, mock_get_session):
 
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = []
-
+        
+        #Non existing parking lot id
         copy_mock_reservation =copy.deepcopy(MOCK_RESERVATION)
         copy_mock_reservation["parking_lot_id"] = "5678"
 
@@ -418,6 +458,10 @@ class TestCreateReservations:
         load_reservation_data,
         mock_get_session,
     ):
+        
+        """
+        Checks when the parking lot is full but there is an available time, a reservation can still be created
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_parking_data.return_value = copy.deepcopy(MOCK_PARKING_LOT_FULL)
 
@@ -470,6 +514,9 @@ class TestCreateReservations:
         load_reservation_data,
         mock_get_session,
     ):
+        """
+        Checks if the earliest time is fetched when a prarking lot is full and a reservation is being created.
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_parking_data.return_value = copy.deepcopy(MOCK_PARKING_LOT_FULL)
 
@@ -502,7 +549,7 @@ class TestCreateReservations:
                 "user_id": "testuser",
                 "vehicle_id": "7abb4afe-cfb3-4b8a-bda3-3723a33ab144",
                 "start_time": "2025-12-07T13:00",
-                "end_time": "2025-12-07T14:00",
+                "end_time": "2025-12-07T12:00",
                 "parking_lot_id": "1",
                 "id": "2",
             }
@@ -541,6 +588,9 @@ class TestCreateReservations:
         load_reservation_data,
         mock_get_session,
     ):
+        """
+        Check if a there is an error when the parking lot is full and there is no available time to make a reservation.
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_parking_data.return_value = copy.deepcopy(MOCK_PARKING_LOT_FULL)
 
@@ -673,21 +723,21 @@ class TestUpdateReservations:
     @patch("endpoints.reservations.load_parking_lot_data")
     def test_missing_auth_update(self, mock_load_parking_data, mock_get_session):
 
+        #authorization is missing
         mock_get_session.return_value = None
         mock_load_parking_data.return_value = copy.deepcopy(MOCK_PARKING_LOT)
 
         response = client.put(
             f"/reservations/{MOCK_RESERVATION['id']}",
-            json=MOCK_RESERVATION,
-            headers={"Authorization": "invalid_token"},
+            json=MOCK_RESERVATION
         )
         assert response.status_code == 401
         assert response.json()["detail"] == "Missing Authorization header"
 
     @patch("endpoints.reservations.get_session")
     @patch("endpoints.reservations.load_parking_lot_data")
-    def test_missing_auth_update(self, mock_load_parking_data, mock_get_session):
-
+    def test_invalid_token_update(self, mock_load_parking_data, mock_get_session):
+        #Invalid session token
         mock_get_session.return_value = None
         mock_load_parking_data.return_value = MOCK_PARKING_LOT
 
@@ -702,7 +752,9 @@ class TestUpdateReservations:
     @patch("endpoints.reservations.get_session")
     @patch("endpoints.reservations.load_parking_lot_data")
     def test_unable_to_load_parking_lot_data_update(self, mock_load_parking_data, mock_get_session):
-
+        """
+        Test if there is an error when the parking lot data is None
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_parking_data.return_value = None
 
@@ -725,6 +777,9 @@ class TestUpdateReservations:
     @patch("endpoints.reservations.load_reservation_data")
     def test_unable_to_load_reservation_data_update(self, mock_load_reservation_data, mock_get_session):
 
+        """
+        Test if there is an error when the reservation data is None
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = None
 
@@ -748,6 +803,9 @@ class TestUpdateReservations:
     @patch("endpoints.reservations.load_reservation_data")
     def test_end_time_before_start_time_update(self, mock_load_reservation_data, mock_get_session):
 
+        """
+        Test if there is a 422 error when the end time is earlier than the start time
+        """
         copy_mock_reservation = copy.deepcopy(MOCK_RESERVATION)
         copy_mock_reservation["start_time"] = "2025-12-07T10:00"
         copy_mock_reservation["end_time"] = "2025-12-06T12:00"
@@ -767,6 +825,9 @@ class TestUpdateReservations:
     def test_load_reservation_data_exception_update(
         self, mock_load_reservation_data, mock_get_session
     ):
+        """
+        Test if there is an exception error when something goes wrong when loading the reservation data
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.side_effect = Exception("Error loading data")
 
@@ -789,6 +850,9 @@ class TestUpdateReservations:
     def test_load_parking_lot_data_exception_update(
         self, mock_load_parking_lot_data, mock_get_session
     ):
+        """
+        Test if there is an exception error when something goes wrong when loading the parking lot data
+        """
         mock_get_session.return_value = MOCK_USER
         mock_load_parking_lot_data.side_effect = Exception("Error loading data")
         updated_data = {
@@ -895,10 +959,10 @@ class TestUpdateReservations:
     @patch("endpoints.reservations.load_reservation_data")
     def test_update_reservation_not_found(
         self, mock_load_reservation_data, mock_get_session
-    ):
+    ):  
+        # Reservations is empty so the updated data will never change
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = []
-
         updated_data = {
             "user_id": "testuser",
             "vehicle_id": "7abb4afe-cfb3-4b8a-bda3-3723a33ab144",
@@ -956,6 +1020,7 @@ class TestUpdateReservations:
         mock_load_reservation_data,
         mock_get_session
     ):
+        #Test if a user can update the cost of their reservation
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = [MOCK_RESERVATION]
 
@@ -985,6 +1050,7 @@ class TestUpdateReservations:
         mock_load_reservation_data,
         mock_get_session
     ):
+        #Test if a user can update the status of their reservation
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = [MOCK_RESERVATION]
 
@@ -1014,9 +1080,10 @@ class TestUpdateReservations:
         mock_load_reservation_data,
         mock_get_session
     ):
+        
         mock_get_session.return_value = MOCK_USER
         mock_load_reservation_data.return_value = [MOCK_RESERVATION]
-
+        # Parking lot id doesn't exist
         updated_data = {
             "vehicle_id": "7abb4afe-cfb3-4b8a-bda3-3723a33ab144",
             "start_time": "2025-12-08T10:00",
@@ -1214,6 +1281,7 @@ class TestDeleteReservations:
         mock_load_reservation_data,
         mock_get_session
     ):
+        #Unauthorized user tries to delete reservation
         mock_get_session.return_value = MOCK_UNAUTHORIZED_USER
         mock_load_reservation_data.return_value = [MOCK_RESERVATION]
 
