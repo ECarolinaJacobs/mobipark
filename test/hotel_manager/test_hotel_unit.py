@@ -109,10 +109,11 @@ class TestCreateHotelDiscountCode:
             notes="VIP",
         )
         response = create_hotel_discount_code(discount_create, session_user)
-        assert response.status_code == status.HTTP_201_CREATED
-        content = response.body.decode()
-        assert "TEST-CODE" in content
-        assert mock_save.called
+        assert response["code"] == "TEST-CODE"
+        assert response["discount_value"] == 100.0
+        assert response["guest_name"] == "Test Guest"
+        assert response["created_by"] == "test_mgr"
+        mock_save.assert_called_once()
 
     @patch("endpoints.hotel_manager_endpoint.load_parking_lot_data")
     @patch("endpoints.hotel_manager_endpoint.get_discount_by_code")
@@ -128,8 +129,9 @@ class TestCreateHotelDiscountCode:
             code="TEST-CODE-2", check_in_date=check_in, check_out_date=check_out
         )
         response = create_hotel_discount_code(discount_create, session_user)
-        assert response.status_code == status.HTTP_201_CREATED
-        assert mock_save.called
+        assert response["code"] == "TEST-CODE-2"
+        assert response["discount_value"] == 100.0
+        mock_save.assert_called_once()
 
     @patch("endpoints.hotel_manager_endpoint.load_parking_lot_data")
     def test_create_discount_code_parking_lot_not_found_dict(self, mock_load_lots):
@@ -263,12 +265,9 @@ class TestGetHotelDiscountCodes:
         ]
         session_user = {"username": "test_mgr"}
         response = get_hotel_discount_codes(session_user)
-        assert response.status_code == status.HTTP_200_OK
-        content = response.body.decode()
-        assert "CODE-1" in content
-        assert "CODE-3" in content
-        assert "CODE-2" not in content
-        assert "ADMIN-CODE" not in content
+        assert len(response) == 2
+        assert all(code["created_by"] == "test_mgr" for code in response)
+        assert all(code["is_hotel_code"] for code in response)
 
     @patch("endpoints.hotel_manager_endpoint.load_discounts_data_from_db")
     def test_get_discount_codes_empty(self, mock_load_discounts):
@@ -276,9 +275,7 @@ class TestGetHotelDiscountCodes:
         mock_load_discounts.return_value = []
         session_user = {"username": "test_mgr"}
         response = get_hotel_discount_codes(session_user)
-        assert response.status_code == status.HTTP_200_OK
-        content = response.body.decode()
-        assert content == "[]"
+        assert response == []
 
     @patch("endpoints.hotel_manager_endpoint.load_discounts_data_from_db")
     def test_get_discount_codes_none_returned(self, mock_load_discounts):
@@ -286,9 +283,7 @@ class TestGetHotelDiscountCodes:
         mock_load_discounts.return_value = None
         session_user = {"username": "test_mgr"}
         response = get_hotel_discount_codes(session_user)
-        assert response.status_code == status.HTTP_200_OK
-        content = response.body.decode()
-        assert content == "[]"
+        assert response == []
 
     @patch("endpoints.hotel_manager_endpoint.load_discounts_data_from_db")
     def test_get_discount_codes_database_error(self, mock_load_discounts):
@@ -315,10 +310,8 @@ class TestGetHotelDiscountCodeByCode:
         }
         session_user = {"username": "test_mgr"}
         response = get_hotel_discount_code_by_code("TEST-CODE", session_user)
-        assert response.status_code == status.HTTP_200_OK
-        content = response.body.decode()
-        assert "TEST-CODE" in content
-        assert "Test Guest" in content
+        assert response["code"] == "TEST-CODE"
+        assert response["created_by"] == "test_mgr"
 
     @patch("endpoints.hotel_manager_endpoint.get_discount_by_code")
     def test_get_discount_code_not_found(self, mock_get_discount):
@@ -365,12 +358,9 @@ class TestDeactivateHotelDiscountCode:
         }
         session_user = {"username": "test_mgr"}
         response = deactivate_hotel_discount_code("ACTIVE-CODE", session_user)
-        assert response.status_code == status.HTTP_200_OK
-        content = response.body.decode()
-        assert '"active":false' in content.lower()
-        assert mock_update.called
-        updated_code = mock_update.call_args[0][1]
-        assert updated_code["active"] is False
+        assert response["active"] is False
+        assert response["code"] == "ACTIVE-CODE"
+        mock_update.assert_called_once()
 
     @patch("endpoints.hotel_manager_endpoint.get_discount_by_code")
     def test_deactivate_code_not_found(self, mock_get_discount):
@@ -411,9 +401,8 @@ class TestDeactivateHotelDiscountCode:
         mock_get_discount.return_value = {"code": "INACTIVE-CODE", "created_by": "test_mgr", "active": False}
         session_user = {"username": "test_mgr"}
         response = deactivate_hotel_discount_code("INACTIVE-CODE", session_user)
-        assert response.status_code == status.HTTP_200_OK
-        updated_code = mock_update.call_args[0][1]
-        assert updated_code["active"] is False
+        assert response["active"] is False
+        mock_update.assert_called_once()
 
 
 class TestGetManagedParkingLot:

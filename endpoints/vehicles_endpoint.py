@@ -3,7 +3,14 @@ from typing import Optional
 from datetime import datetime
 import uuid
 
-from models.vehicles_model import VehicleCreate, VehicleOut
+from models.vehicles_model import (
+    VehicleCreate,
+    VehicleOut,
+    VehicleListResponse,
+    DeleteResponse,
+    VehicleReservationsResponse,
+    VehicleHistoryResponse,
+)
 from utils.storage_utils import (
     get_vehicle_data_by_user,
     update_existing_vehicle_in_db,
@@ -42,7 +49,10 @@ def find_vehicle_by_license_plate(license_plate: str):
     response_description="Created vehicle details",
     response_model=VehicleOut,
 )
-def create_vehicle(payload: VehicleCreate, authorization: Optional[str] = Header(None)):
+def create_vehicle(
+    payload: VehicleCreate,
+    authorization: Optional[str] = Header(None, description="Bearer token for authentication"),
+):
     """
     Create a new vehicle for the authenticated user
     :param payload: vehicle data
@@ -76,9 +86,22 @@ def create_vehicle(payload: VehicleCreate, authorization: Optional[str] = Header
     return new_vehicle
 
 
-@router.get("/vehicles/{username}", response_model=dict)
-@router.get("/vehicles", response_model=dict)
-def get_user_vehicles(username: Optional[str] = None, authorization: Optional[str] = Header(None)):
+@router.get(
+    "/vehicles/{username}",
+    response_model=VehicleListResponse,
+    summary="Get vehicles for a specific user",
+    response_description="List of vehicles for the user",
+)
+@router.get(
+    "/vehicles",
+    response_model=VehicleListResponse,
+    summary="Get vehicles for authenticated user",
+    response_description="List of vehicles for the authenticated user",
+)
+def get_user_vehicles(
+    username: Optional[str] = None,
+    authorization: Optional[str] = Header(None, description="Bearer token for authentication"),
+):
     """Get all vehicles for a specific user or the authenticated user
     :param username: optional username for retrieving vehicles
     :param authorization: authentication token from request header
@@ -97,8 +120,17 @@ def get_user_vehicles(username: Optional[str] = None, authorization: Optional[st
     return {"vehicles": vehicles}
 
 
-@router.put("/vehicles/{license_plate}", response_model=VehicleOut)
-def update_vehicle(license_plate: str, payload: VehicleCreate, authorization: Optional[str] = Header(None)):
+@router.put(
+    "/vehicles/{license_plate}",
+    response_model=VehicleOut,
+    summary="Update vehicle information",
+    response_description="Updated vehicle details",
+)
+def update_vehicle(
+    license_plate: str,
+    payload: VehicleCreate,
+    authorization: Optional[str] = Header(None, description="Bearer token for authentication"),
+):
     """
     Update an existing vehicle's information
     :param license_plate: license plate of vehicle to update
@@ -128,8 +160,16 @@ def update_vehicle(license_plate: str, payload: VehicleCreate, authorization: Op
     return target_vehicle
 
 
-@router.delete("/vehicles/{license_plate}")
-def delete_vehicle(license_plate: str, authorization: Optional[str] = Header(None)):
+@router.delete(
+    "/vehicles/{license_plate}",
+    response_model=DeleteResponse,
+    summary="Delete a vehicle",
+    response_description="Deletion confirmation",
+)
+def delete_vehicle(
+    license_plate: str,
+    authorization: Optional[str] = Header(None, description="Bearer token for authentication"),
+):
     """
     Delete a vehicle by it's license plate
     :param license_plate: license plate of the vehicle to delete
@@ -153,8 +193,16 @@ def delete_vehicle(license_plate: str, authorization: Optional[str] = Header(Non
     return {"status": "Deleted"}
 
 
-@router.get("/vehicles/{license_plate}/reservations")
-def get_vehicle_reservations(license_plate: str, authorization: Optional[str] = Header(None)):
+@router.get(
+    "/vehicles/{license_plate}/reservations",
+    response_model=VehicleReservationsResponse,
+    summary="Get vehicle reservations",
+    response_description="List of reservations for the vehicle",
+)
+def get_vehicle_reservations(
+    license_plate: str,
+    authorization: Optional[str] = Header(None, description="Bearer token for authentication"),
+):
     """
     Get all reservations for a specific vehicle
     :param license_plate: license plate of the vehicle
@@ -186,8 +234,16 @@ def get_vehicle_reservations(license_plate: str, authorization: Optional[str] = 
     return {"reservations": vehicle_reservations}
 
 
-@router.get("/vehicles/{license_plate}/history")
-def get_vehicle_history(license_plate: str, authorization: Optional[str] = Header(None)):
+@router.get(
+    "/vehicles/{license_plate}/history",
+    response_model=VehicleHistoryResponse,
+    summary="Get vehicle parking history",
+    response_description="List of completed parking sessions",
+)
+def get_vehicle_history(
+    license_plate: str,
+    authorization: Optional[str] = Header(None, description="Bearer token for authentication"),
+):
     """
     Get the parking session history for a specific vehicle
     :param license_plate: Description
