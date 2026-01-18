@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 USER = "USER"
 ADMIN = "ADMIN"
 
+# --- Helper Functions ---
 
 def require_auth(request: Request) -> Dict[str, str]:
     auth_token = request.headers.get("Authorization")
@@ -34,8 +35,6 @@ def require_auth(request: Request) -> Dict[str, str]:
 
     return session_user
 
-
-# --- Helper Functions ---
 def find_earliest_available_time(parking_lot_id: str, reservations: List[Dict[str, Any]]) -> Optional[str]:
     """find the earliest end_time from all active reservations for a specific parking lot
     (returns earliest end_time as string, none if no reservations)"""
@@ -105,11 +104,29 @@ router = APIRouter(
 )
 
 
-@router.post("/reservations/")
+@router.post(
+    "/reservations/",
+    summary="Create a reservation",
+    description="Create a reservation for a parking lot",
+    tags=["reservations"],
+    response_description="Succesfully created a reservation",
+    responses= {
+        500: {"description": "Error loading or saving data"},
+        404: {"description": "Parking lor not found"},
+        442: {"description": "end_time must be after start_time"},
+        409: {"description": "Parking lot is full"}
+        }
+)
 def create_reservation(
     reservation_data: CreateReservation, session_user: Dict[str, str] = Depends(require_auth)
 ) -> JSONResponse:
+    """
+    Create a reservation for a parking lot.
 
+    - **Users**: Can only create reservations for themselves.
+    - **Admins**: Must provide a user_id to create a reservation for a user.
+    - **Validation**: Checks if the lot is full, if start time is before end time and if the required fields are implemented.
+    """
     try:
     
         reservations = load_reservation_data()
@@ -180,9 +197,26 @@ def create_reservation(
     )
 
 
-@router.get("/reservations/{reservation_id}")
+@router.get(
+    "/reservations/{reservation_id}",
+    summary="Retrieve reservation by id",
+    description="Retrieve reservation by id",
+    tags=["reservations"],
+    response_description="Succesfully retrieved reservation",
+    responses= {
+        500: {"description": "Error loading or saving data"},
+        403: {"description": "Access denied"},
+        404: {"description": "Reservation not found"}
+    }
+    )
 def get_reservation_by_id(reservation_id: str, session_user: Dict[str, str] = Depends(require_auth)):
+    """
+    Retrieve a reservation by id.
 
+    -**USERS**: Can only retrieve their own reservation
+    -**ADMIN**: Can Retrieve all reservations
+    -**Validation**: Looks if the user is allowed to retrieve the reservation data, checks if the reservation exists.
+    """
     try:
         reservations = load_reservation_data()
         if reservations is None:
@@ -206,13 +240,39 @@ def get_reservation_by_id(reservation_id: str, session_user: Dict[str, str] = De
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
 
 
-@router.put("/reservations/{reservation_id}")
+@router.put(
+    "/reservations/{reservation_id}",
+    summary="Update a reservation",
+    description="Update a reservation by id.",
+    tags=["reservations"],
+    response_description="Succesfully updated reservation",
+    responses= {
+        500: {"description": "Error loading or saving data"},
+        422: {"description": "end_time must be after start_time"},
+        403: {"description": "Access denied"},
+        401: {"description": "Required field missing"},
+        404: {"description": "Parking lot or reservation not found"},
+    }
+    )
 def update_reservation(
     reservation_id: str,
     reservation_data: UpdateReservation,
     session_user: Dict[str, str] = Depends(require_auth),
 ):
+    """
+    Update a reservation by id.
 
+    -**Users**: Can only update their own reservation and cant update the cost or status of the reservation
+    -**Admin**: Can update every clients reservation including the cost and status of it
+    -**Validation**:
+        Checks if the end time is before the start time.
+        Checks if the user has permission to update the reservation.
+        Denies permission to update the cost and status if its a user and not Admin.
+        Checks if the status is valid.
+        If the admin updates a reservation, checks if the the user_id is given.
+        Checks if the updated parking lot id exists.
+        Gives an error if the reservation is not found.
+    """
     try:
         reservations = load_reservation_data()
         parking_lots = load_parking_lot_data()
@@ -237,19 +297,19 @@ def update_reservation(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
         if session_user.get("role") != ADMIN:
             if reservation_data.cost is not None:
-                raise HTTPException(status_code=403, detail="Only admins can modify reservation cost")
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can modify reservation cost")
             if reservation_data.status is not None:
-                raise HTTPException(status_code=403, detail="Only admins can modify reservation status")
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can modify reservation status")
 
         if session_user.get("role") == ADMIN and reservation_data.status is not None:
             VALID_STATUSES = ["pending", "confirmed", "cancelled"]
             if reservation_data.status not in VALID_STATUSES:
-                raise HTTPException(status_code=403, detail="Invalid status")
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid status")
 
         if session_user.get("role") == ADMIN:
             if not reservation_data.user_id:
                 return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT   ,
                     content={"error": "Required field missing", "field": "user_id"},
                 )
         else:
@@ -296,8 +356,29 @@ def update_reservation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
 
 
-@router.delete("/reservations/{reservation_id}")
+@router.delete(
+    "/reservations/{reservation_id}",
+    summary="Delete a reservation.",
+    description="Delete a reservation by id.",
+    tags=["reservations"],
+    response_description="Succesfully removed a reservation",
+    responses= {
+        500: {"description": "Error loading or saving data"},
+        403: {"description": "Access denied"},
+        404: {"description": "Reservation not found"},
+    }
+)
 def delete_reservation(reservation_id: str, session_user: Dict[str, str] = Depends(require_auth)):
+    """
+    Delete a reservation by id.
+
+    -**Users**: Can only delete their own reservation.
+    -**Admin**: Can delete every reservation
+    -**Validation**:
+    Checks if the reservation belongs to the user.
+        Checks if the parking lot exists.
+        Checks if the reservation exists
+    """
     try:
         reservations = load_reservation_data()
         parking_lots = load_parking_lot_data()
