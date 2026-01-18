@@ -1,15 +1,19 @@
 from pydantic import BaseModel, Field, field_validator
 import re
 from datetime import datetime
+from typing import List
 
 
 class VehicleCreate(BaseModel):
-    user_id: str
-    license_plate: str = Field(..., min_length=6, max_length=8)
-    make: str
-    model: str
-    color: str
-    year: int
+    """Model for creating a new vehicle"""
+
+    license_plate: str = Field(
+        ..., min_length=6, max_length=8, description="Dutch license plate", examples=["AB-123-CD"]
+    )
+    make: str = Field(..., description="Vehicle manufacturer", examples=["Toyota"])
+    model: str = Field(..., description="Vehicle model", examples=["Corolla"])
+    color: str = Field(..., description="Vehicle color", examples=["Red"])
+    year: int = Field(..., description="Manufacturing year", examples=[2020])
 
     @field_validator("license_plate")
     @classmethod
@@ -35,12 +39,35 @@ class VehicleCreate(BaseModel):
 
 
 class VehicleOut(BaseModel):
-    id: str
-    user_id: str
-    license_plate: str
-    make: str
-    model: str
-    color: str
-    year: int
-    created_at: datetime
-    # updated_at: datetime
+    id: str = Field(..., description="Unique vehicle ID")
+    user_id: str = Field(..., description="Owner's username")
+    license_plate: str = Field(..., description="Vehicle license plate")
+    make: str = Field(..., description="Vehicle manufacturer")
+    model: str = Field(..., description="Vehicle model")
+    color: str = Field(..., description="Vehicle color")
+    year: int = Field(..., description="Manufacturing year")
+    created_at: str = Field(..., description="Creation timestamp (ISO format)")
+
+
+class VehicleListResponse(BaseModel):
+    """list of vehicles"""
+
+    vehicles: List[VehicleOut]
+
+
+class DeleteResponse(BaseModel):
+    """Deletion confirmation"""
+
+    status: str = Field(..., examples=["Deleted"])
+
+
+class VehicleReservationsResponse(BaseModel):
+    """Vehicle reservations list"""
+
+    reservations: List[dict]
+
+
+class VehicleHistoryResponse(BaseModel):
+    """Vehicle parking history"""
+
+    history: List[dict]

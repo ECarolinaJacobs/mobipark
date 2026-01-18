@@ -40,11 +40,9 @@ def register_admin(username="admin_user", password="123", name="Admin"):
     res = requests.post(f"{url}/auth/register", json=register_data)
 
     if res.status_code == 400 and "Username already exists" in res.text:
-        # User already exists, update role and login
         update_user_role(username, "ADMIN")
         res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
     else:
-        # New user - update role then re-login to get new session with ADMIN role
         update_user_role(username, "ADMIN")
         res = requests.post(f"{url}/auth/login", json={"username": username, "password": password})
 
@@ -84,12 +82,10 @@ def test_missing_fields():
     }  # missing the license plate field
     res = requests.post(f"{url}/vehicles", json=data, headers=headers)
 
-    assert res.status_code == 422  # changed to match fastapi validation
+    assert res.status_code == 422
     body = res.json()
     assert "detail" in body
-    assert any(
-        "license_plate" in str(err["loc"]) for err in body["detail"]
-    )  # changed because removal status wrapper
+    assert any("license_plate" in str(err["loc"]) for err in body["detail"])
 
 
 # test passed if creating new vehicle returns 201 with status success
@@ -124,9 +120,7 @@ def test_vehicle_creating_duplicate():
         "color": "Silver",
         "year": 2021,
     }
-    # first creation passes
     requests.post(f"{url}/vehicles", json=data, headers=headers)
-    # duplicate creation should fail
     res = requests.post(f"{url}/vehicles", json=data, headers=headers)
     assert res.status_code == 400
     assert res.json()["detail"] == "Vehicle already exists"
@@ -180,9 +174,7 @@ def test_update_nonvehicle():
 
 # test passed if admin can update vehicle details (e.g., color) of another user's vehicle
 def test_update_vehicle_existing_data_by_admin():
-    # Create admin user
     admin_headers = register_admin("admin_update_test", "123", "Admin")
-    # Create normal user and their vehicle
     user_headers = register_login("normal_update_user", "123")
     unique_plate = valid_plate()
     create_data = {
@@ -197,14 +189,13 @@ def test_update_vehicle_existing_data_by_admin():
     create_res = requests.post(f"{url}/vehicles", json=create_data, headers=user_headers)
     assert create_res.status_code == 200
 
-    # Admin updates the vehicle color
     lid = unique_plate.replace("-", "").upper()
     update_data = {
         "user_id": "dummy",
         "license_plate": unique_plate,
         "make": "Toyota",
         "model": "Yaris",
-        "color": "Red",  # changed color
+        "color": "Red",
         "year": 2020,
     }
     update_res = requests.put(f"{url}/vehicles/{lid}", json=update_data, headers=admin_headers)
@@ -214,10 +205,8 @@ def test_update_vehicle_existing_data_by_admin():
     assert body["license_plate"] == unique_plate
     assert body["color"] == "Red"
     assert body["make"] == "Toyota"
-    assert "created_at" in body  # still returned
-    # no 'updated_at' in new model
+    assert "created_at" in body
 
-    # Verify the update persisted by fetching the vehicle list as admin
     get_res = requests.get(f"{url}/vehicles/normal_update_user", headers=admin_headers)
     assert get_res.status_code == 200
     vehicles = get_res.json()
@@ -385,7 +374,6 @@ def test_get_vehicle_reservations():
         assert body["reservations"][0]["vehicle_id"] == vehicle_id
 
 
-
 # test passed if creating a vehicle with an empty or whitespace-only name is rejected (400 or 422)
 def test_vehicle_name_empty_or_whitespace():
     headers = register_login("edge_user1", "123")
@@ -525,7 +513,6 @@ def test_delete_vehicle_not_owned_by_user():
 
     lid = "45AA44"
 
-    # user2 attempts to delete user1's vehicle — should be forbidden
     res = requests.delete(f"{url}/vehicles/{lid}", headers=user2)
 
     assert res.status_code == 403
@@ -548,7 +535,6 @@ def test_nonadmin_access_other_user_vehicles():
     }
     requests.post(f"{url}/vehicles", json=data, headers=headers1)
 
-    # user2 (non-admin) tries to access user1’s vehicle list — should be forbidden
     res = requests.get(f"{url}/vehicles/edge_user9", headers=headers2)
 
     assert res.status_code == 403
@@ -556,7 +542,6 @@ def test_nonadmin_access_other_user_vehicles():
 
 
 # test passed if fetching history for a non-existent vehicle returns 404
-# NOTE: history endpoint currently returns an empty list for vehicles (add test vehicle behavior after implementation)
 def test_history_nonexistent_vehicle():
     headers = register_login("edge_user11", "123")
     res = requests.get(f"{url}/vehicles/99ZZ9/history", headers=headers)
@@ -564,14 +549,12 @@ def test_history_nonexistent_vehicle():
 
 
 # test passed if unauthorized users trying to access reservations are rejected (401)
-# NOTE: the reservations endpoint is a placeholder that returns {"reservations": []} when valid
 def test_reservations_unauthorized_access():
     res = requests.get(f"{url}/vehicles/11AC1/reservations")
     assert res.status_code == 401
 
 
 # test passed if requesting reservations for a non-existing vehicle returns 404
-# NOTE: reservation logic itsself is not yet implemented, this only tests error handling
 def test_reservations_nonexistend_vehicle():
     headers = register_login("edge_user12", "123")
     res = requests.get(f"{url}/vehicles/doesnotexists/reservations", headers=headers)

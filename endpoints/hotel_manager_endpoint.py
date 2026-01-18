@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 from datetime import datetime
 import logging
 
@@ -13,7 +13,7 @@ from utils.storage_utils import (
     load_discounts_data_from_db,
     update_existing_discount_in_db,
 )
-from models.hotel_manager_model import HotelDiscountCodeCreate
+from models.hotel_manager_model import HotelDiscountCodeCreate, HotelDiscountCode
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +65,14 @@ router = APIRouter(
 
 @router.post(
     "/discount-codes",
+    response_model=HotelDiscountCode,
     summary="Create a 100% discount code for hotel guests (Hotel manager only)",
     response_description="Created discount code details",
     status_code=status.HTTP_201_CREATED,
 )
 def create_hotel_discount_code(
     discount_create: HotelDiscountCodeCreate, session_user: Dict[str, str] = Depends(require_hotel_manager)
-) -> JSONResponse:
+) -> HotelDiscountCode:
     """hotel managers can create 100% discount codes for their guests,
     these are only valid for the parking lots they manage
     :param discount_create: discount code creation data
@@ -137,7 +138,7 @@ def create_hotel_discount_code(
             f"by {session_user['username']} for parking lot {managed_lot_id} "
             f"(valid from {discount_create.check_in_date} to {discount_create.check_out_date})"
         )
-        return JSONResponse(content=discount_code, status_code=status.HTTP_201_CREATED)
+        return discount_code
     except HTTPException:
         raise
     except Exception as e:
@@ -147,12 +148,10 @@ def create_hotel_discount_code(
         )
 
 
-@router.get(
-    "/discount-codes",
-    summary="Get all discount codes created by this hotel manager",
-    response_description="List of hotel discount codes",
-)
-def get_hotel_discount_codes(session_user: Dict[str, str] = Depends(require_hotel_manager)) -> JSONResponse:
+@router.get("/discount-codes", response_model=List[HotelDiscountCode])
+def get_hotel_discount_codes(
+    session_user: Dict[str, str] = Depends(require_hotel_manager),
+) -> List[HotelDiscountCode]:
     """returns all discount codes created by the authenticated hotel manager for their parking lot
     :param session_user: authenticated hotel manager's session data
     :return: jsonResponse with list of discount codes created by this hotel manager
@@ -164,7 +163,7 @@ def get_hotel_discount_codes(session_user: Dict[str, str] = Depends(require_hote
             for code in all_discount_codes
             if code.get("created_by") == session_user["username"] and code.get("is_hotel_code")
         ]
-        return JSONResponse(content=hotel_codes, status_code=status.HTTP_200_OK)
+        return hotel_codes
     except Exception as e:
         logger.error(f"Failed to load hotel discount codes: {e}")
         raise HTTPException(
@@ -174,12 +173,13 @@ def get_hotel_discount_codes(session_user: Dict[str, str] = Depends(require_hote
 
 @router.get(
     "/discount-codes/{code}",
+    response_model=HotelDiscountCode,
     summary="Get a specific discount code by code",
     response_description="Discount code details",
 )
 def get_hotel_discount_code_by_code(
     code: str, session_user: Dict[str, str] = Depends(require_hotel_manager)
-) -> JSONResponse:
+) -> HotelDiscountCode:
     """returns details of a specific discount code if it was created by this hotel manager
     :param code: the discount code to retrieve
     :param session_user: authenticated hotel manager's session data
@@ -195,7 +195,7 @@ def get_hotel_discount_code_by_code(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="You can only view discount codes you created"
             )
-        return JSONResponse(content=discount_code, status_code=status.HTTP_200_OK)
+        return discount_code
 
     except HTTPException:
         raise
@@ -208,12 +208,13 @@ def get_hotel_discount_code_by_code(
 
 @router.delete(
     "/discount-codes/{code}",
+    response_model=HotelDiscountCode,
     summary="Deactivate a hotel discount code",
     response_description="Deactivated discount code details",
 )
 def deactivate_hotel_discount_code(
     code: str, session_user: Dict[str, str] = Depends(require_hotel_manager)
-) -> JSONResponse:
+) -> HotelDiscountCode:
     """deactivates a discount code created by this hotel manager
     :param code: the discount code to deactivate
     :param session_user: authenticated hotel manager's session data
@@ -240,7 +241,7 @@ def deactivate_hotel_discount_code(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to deactivate discount code"
             )
         logger.info(f"Hotel discount code deactivated: {code} by {session_user['username']}")
-        return JSONResponse(content=updated_discount, status_code=status.HTTP_200_OK)
+        return updated_discount
     except HTTPException:
         raise
     except Exception as e:

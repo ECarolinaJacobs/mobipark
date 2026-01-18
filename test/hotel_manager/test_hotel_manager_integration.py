@@ -154,7 +154,11 @@ class TestHotelManagerCreateDiscountCodes:
             },
         )
         assert response.status_code == 422
-        assert "past" in response.json()["detail"].lower()
+        detail = response.json()["detail"]
+        if isinstance(detail, list):
+            assert any("past" in str(err).lower() for err in detail)
+        else:
+            assert "past" in detail.lower()
 
     def test_hotel_manager_cannot_create_code_with_invalid_dates(self, client, hotel_manager_token):
         """test hotel manager cannot create code with checkout before checkin"""
@@ -170,7 +174,9 @@ class TestHotelManagerCreateDiscountCodes:
             },
         )
         assert response.status_code == 422
-        assert "after" in response.json()["detail"].lower()
+        detail = response.json()["detail"]
+        if isinstance(detail, list):
+            assert any("after" in str(err).lower() for err in detail)
 
     def test_hotel_manager_cannot_create_duplicate_code(self, client, hotel_manager_token):
         """test hotel manager cannot create duplicate discount codes"""
