@@ -548,8 +548,8 @@ class TestCreateReservations:
             {
                 "user_id": "testuser",
                 "vehicle_id": "7abb4afe-cfb3-4b8a-bda3-3723a33ab144",
-                "start_time": "2025-12-07T13:00",
-                "end_time": "2025-12-07T12:00",
+                "start_time": "2025-12-07T14:30",
+                "end_time": "2025-12-07T15:00",
                 "parking_lot_id": "1",
                 "id": "2",
             }
