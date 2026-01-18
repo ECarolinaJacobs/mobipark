@@ -12,6 +12,21 @@ router = APIRouter()
 
 @router.get("/profile", response_model=ProfileResponse)
 def get_profile(authorization: str = Header(None)):
+    """
+    Retrieve the profile information of the authenticated user.
+    authorization: Session token (required in header)
+    
+    Return complete profile information including:
+    - User ID
+    - Username
+    - Name
+    - Email
+    - Phone
+    - Role
+    - Created timestamp
+    - Birth year
+    - Active status
+    """
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -43,6 +58,21 @@ def update_profile(
     update_data: ProfileUpdateRequest,
     authorization: str = Header(None)
 ):
+    """
+    Update the profile information of the authenticated user.
+    
+    authorization: Session token (required in header)
+    update_data: Profile fields to update (all fields are optional)
+    
+    Updatable fields:
+    name: User's full name
+    email: User's email address
+    phone: User's phone number
+    birth_year: User's birth year
+    password: New password (will be securely hashed)
+    
+    Return a success message upon successful update.
+    """
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

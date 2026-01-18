@@ -32,12 +32,15 @@ MOCK_BILLING_RECORD = [
 
 
 class TestGetBillingUser:
+    """Test cases for GET /billing endpoint - retrieve authenticated user's billing information"""
+
     @patch("endpoints.billing_endpoint.get_session")
     @patch("endpoints.billing_endpoint.billing_utils.get_user_session_by_username")
     @patch("endpoints.billing_endpoint.billing_utils.format_billing_record")
     def test_get_own_billing_success(
         self, mock_format, mock_get_sessions, mock_session
     ):
+        """Test cases for GET /billing endpoint - retrieve authenticated user's billing information"""
         mock_session.return_value = MOCK_USER
         mock_get_sessions.return_value = [{}]
         mock_format.return_value = MOCK_BILLING_RECORD
@@ -55,6 +58,7 @@ class TestGetBillingUser:
 
     @patch("endpoints.billing_endpoint.get_session")
     def test_get_billing_unauthorized(self, mock_session):
+        """Test billing retrieval fails without valid authorization token"""
         mock_session.return_value = None
 
         response = client.get("/billing")
@@ -67,6 +71,8 @@ class TestGetBillingUser:
     def test_get_billing_empty(
         self, mock_format, mock_get_sessions, mock_session
     ):
+        """Test successful response when user has no billing records"""
+
         mock_session.return_value = MOCK_USER
         mock_get_sessions.return_value = []
         mock_format.return_value = []
@@ -77,12 +83,15 @@ class TestGetBillingUser:
 
 
 class TestGetBillingAdmin:
+    """Test cases for GET /billing/{username} endpoint - admin access to any user's billing information"""
+
     @patch("endpoints.billing_endpoint.get_session")
     @patch("endpoints.billing_endpoint.billing_utils.get_user_session_by_username")
     @patch("endpoints.billing_endpoint.billing_utils.format_billing_record")
     def test_admin_get_user_billing_success(
         self, mock_format, mock_get_sessions, mock_session
     ):
+        """Test successful admin retrieval of another user's billing records"""
         mock_session.return_value = MOCK_ADMIN
         mock_get_sessions.return_value = [{}]
         mock_format.return_value = MOCK_BILLING_RECORD
@@ -98,6 +107,7 @@ class TestGetBillingAdmin:
 
     @patch("endpoints.billing_endpoint.get_session")
     def test_admin_billing_missing_token(self, mock_session):
+        """Test admin billing endpoint fails without authorization token"""
         mock_session.return_value = None
 
         response = client.get("/billing/testuser")
@@ -106,6 +116,7 @@ class TestGetBillingAdmin:
 
     @patch("endpoints.billing_endpoint.get_session")
     def test_non_admin_cannot_access_other_user(self, mock_session):
+        """Test non-admin users cannot access other users' billing information"""
         mock_session.return_value = MOCK_USER
 
         response = client.get(
@@ -121,6 +132,8 @@ class TestGetBillingAdmin:
     def test_admin_get_nonexistent_user(
         self, mock_format, mock_get_sessions, mock_session
     ):
+        """Test admin can query billing for non-existent users (returns empty list)"""
+
         mock_session.return_value = MOCK_ADMIN
         mock_get_sessions.return_value = []
         mock_format.return_value = []
@@ -134,12 +147,15 @@ class TestGetBillingAdmin:
 
 
 class TestBillingEdgeCases:
+    """Test cases for billing data validation and edge cases"""
+
     @patch("endpoints.billing_endpoint.get_session")
     @patch("endpoints.billing_endpoint.billing_utils.get_user_session_by_username")
     @patch("endpoints.billing_endpoint.billing_utils.format_billing_record")
     def test_balance_calculation(
         self, mock_format, mock_get_sessions, mock_session
     ):
+        """Test billing balance is correctly calculated as amount minus paid"""
         mock_session.return_value = MOCK_USER
         mock_get_sessions.return_value = [{}]
         mock_format.return_value = MOCK_BILLING_RECORD
@@ -157,6 +173,7 @@ class TestBillingEdgeCases:
     def test_transaction_hash_exists(
         self, mock_format, mock_get_sessions, mock_session
     ):
+        """Test all billing records contain valid transaction hash"""
         mock_session.return_value = MOCK_USER
         mock_get_sessions.return_value = [{}]
         mock_format.return_value = MOCK_BILLING_RECORD

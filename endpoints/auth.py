@@ -13,6 +13,13 @@ router = APIRouter()
 
 @router.post("/login")
 def login(login_data: LoginRequest, response: Response):
+    """
+    Authenticate a user and create a session.
+    username: User's username
+    password: User's password
+    Return a session token that should be used in the Authorization header for authenticated requests.
+    Automatically upgrades legacy MD5 passwords to bcrypt upon successful login.
+    """
     username = login_data.username
     password = login_data.password
 
@@ -76,6 +83,21 @@ def login(login_data: LoginRequest, response: Response):
 
 @router.post("/register")
 def register(register_data: RegisterRequest, response: Response, authorization: str = Header(None)):
+    """
+    Register a new user account.
+    
+    - username: Unique username for the account
+    - password: User's password (will be securely hashed with bcrypt)
+    - name: User's full name
+    - role: User role (USER, ADMIN) - defaults to USER
+    - email: User's email address (optional)
+    - phone: User's phone number (optional)
+    - birth_year: User's birth year (optional)
+    - managed_parking_lot_id: Parking lot ID if user manages one (optional)
+    
+    Creating an ADMIN account requires an existing admin's authorization token.
+    Return a session token for the newly created account.
+    """
     username = register_data.username
     password = register_data.password
     name = register_data.name
@@ -181,6 +203,13 @@ def register_hotel_manager(hotel_manager_data: HotelManagerCreate, authorization
 
 @router.post("/logout")
 def logout(token: str):
+    """
+    Logout a user and invalidate their session.
+    
+    token: Session token to invalidate
+    
+    Returns a confirmation message upon successful logout.
+    """
     user = remove_session(token)
     if user:
         return {"message": "User logged out"}
