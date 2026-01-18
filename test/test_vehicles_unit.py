@@ -345,9 +345,10 @@ class TestGetVehicleHistory:
     def test_get_own_vehicle_history(self, mock_load_sessions, mock_load_lots, mock_find, mock_session):
         mock_session.return_value = MOCK_USER
         mock_find.return_value = MOCK_VEHICLE.copy()
-        mock_load_lots.return_value = {"1": {"name": "Test Parking Lot", "address": "123 Test St"}}
-        mock_load_sessions.return_value = {
-            "1": {
+        mock_load_lots.return_value = [{"id": "1", "name": "Test Parking Lot", "address": "123 Test St"}]
+        mock_load_sessions.return_value = [
+            {
+                "id": "1",
                 "licenseplate": "AB-12-CD",
                 "started": "2024-01-01T10:00:00",
                 "stopped": "2024-01-01T12:00:00",
@@ -356,7 +357,7 @@ class TestGetVehicleHistory:
                 "cost": 10.0,
                 "payment_status": "Pending",
             }
-        }
+        ]
         response = client.get("/vehicles/AB12CD/history", headers={"Authorization": "valid-token"})
         assert response.status_code == 200
         data = response.json()

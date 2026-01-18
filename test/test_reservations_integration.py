@@ -409,6 +409,7 @@ def test_update_reservation_not_found(vehicle_creation_succes):
     assert res.status_code == 404
     assert res.json()["detail"] == "Reservation not found"
 
+
 #Test if a user is able to update a reservation.
 def test_update_reservation_success(vehicle_creation_succes):
     vehicle, headers = vehicle_creation_succes
@@ -435,6 +436,8 @@ def test_update_reservation_success(vehicle_creation_succes):
     reservation = res_put.json()["reservation"]
     for key in new_data:
         assert reservation[key] == new_data[key]
+
+
 
 
 # ======================================================================================

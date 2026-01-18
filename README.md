@@ -208,14 +208,18 @@ Closes #123 (or N/A)
 * Add tests in `tests/` for non-trivial logic.
 * Use environment variables for secrets and configuration.
 
----
+## Database protection password -- explanation and todo:
+* The production database file is encrypted with a password using SQLCipher (256-bit AES encryption).
+* The password is stored in GitHub Secrets (never in code or .env files).
+* When you push code, the CD pipeline automatically injects the password into the production Docker container.
+* The application uses this password to unlock and access the encrypted database.
+* If someone steals the database file, they cannot read it without the password.
 
-If you'd like, I can also:
-
-* produce a `PR_TEMPLATE.md` file,
-* generate an example `endpoints/auth.py` based on your repo style, or
-* convert this document into an actual `README.md` file in your repo structure.
-
----
+What to do now:
+* There is a .env.examples file in the code base, which also shows what needs to be added
+*  USE_MOCK_DATA=true
+   USE_DB_ENCRYPTION=false
+   DB_PASSWORD=not-used-locally
+*NOTE: the reason the password here is not-used-locally is because the database is only used at production. This means that when the pushed code goes to production, the pipeline adds the actual password which is stored in github secrets. 
 
 *End of guide.*

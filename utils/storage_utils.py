@@ -7,8 +7,17 @@ from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 
+try:
+    from pysqlcipher3 import dbapi2 as sqlite3_encrypted
+
+    ENCRYPTION_AVAILABLE = True
+except ImportError:
+    sqlite3_encrypted = None
+    ENCRYPTION_AVAILABLE = False
+
 load_dotenv()
 use_mock_data = os.getenv("USE_MOCK_DATA", "true") == "true"
+use_encryption = os.getenv("USE_DB_ENCRYPTION", "false") == "true"
 MOCK_PARKING_LOTS = (Path(__file__).parent.parent / "mock_data/mock_parking-lots.json").resolve()
 MOCK_PARKING_SESSIONS = (Path(__file__).parent.parent / "mock_data/pdata/mock_parkingsessions.json").resolve()
 MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolve()
@@ -28,6 +37,28 @@ else:
     DB_PATH = Path(__file__).parent / "../data/mobypark.db"
 
 
+def get_db_connection():
+    """Get a database connection, encrypted if available and enabled,
+    standard SQLite if encryption is not available"""
+    if use_encryption:
+        if not ENCRYPTION_AVAILABLE:
+            print("Warning: encryption requested but not available")
+            return get_db_connection()
+        db_password = os.environ.get("DB_PASSWORD")
+        if not db_password:
+            raise ValueError("DB_PASSWORD environment variable not set but encryption is enabled")
+        conn = sqlite3_encrypted.connect(str(DB_PATH))
+        conn.execute(f"PRAGMA key='{db_password}'")
+        try:
+            conn.execute("SELECT count(*) FROM sqlite_master")
+        except Exception as e:
+            conn.close()
+            raise ValueError(f"Failed to decrypt database. check DB_PASSWORD: {e}")
+        return conn
+    else:
+        return sqlite3.connect(DB_PATH)
+
+
 def init_db():
     """
     Initializes the database and creates tables if they don't exist.
@@ -35,11 +66,11 @@ def init_db():
     # Create the data directory if it doesn't exist
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db_connection() as conn:
         cursor = conn.cursor()
-
         # Create users table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT,
                 username TEXT PRIMARY KEY,
@@ -54,10 +85,12 @@ def init_db():
                 last_login TEXT,
                 hash_type TEXT
             )
-        """)
+        """
+        )
 
         # Create parking_lots table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS parking_lots (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -71,10 +104,12 @@ def init_db():
                 "coordinates.lat" REAL,
                 "coordinates.lng" REAL
             )
-        """)
+        """
+        )
 
         # create parking sessions table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS parking_sessions (
             id TEXT PRIMARY KEY,
             parking_lot_id text,
@@ -87,10 +122,12 @@ def init_db():
             payment_status TEXT,
             FOREIGN KEY (parking_lot_id) REFERENCES parking_lots (id)
 
-            ) """)
-                       
+            ) """
+        )
+
         # Create reservations table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS reservations (
                 id TEXT PRIMARY KEY,
                 user_id TEXT,
@@ -102,10 +139,12 @@ def init_db():
                 status TEXT,
                 created_at TEXT
             )
-        """)
+        """
+        )
 
         # Create payments table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS payments (
                 "transaction" TEXT PRIMARY KEY,
                 amount REAL,
@@ -124,10 +163,12 @@ def init_db():
                 "t_data.issuer" TEXT,
                 "t_data.bank" TEXT
             )
-        """)
+        """
+        )
 
         # Create discounts table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS discounts (
                 code TEXT PRIMARY KEY,
                 discount_type TEXT,
@@ -138,10 +179,12 @@ def init_db():
                 created_at TEXT,
                 expires_at TEXT
             )
-        """)
+        """
+        )
 
         # Create refunds table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS refunds (
                 refund_id TEXT PRIMARY KEY,
                 original_transaction_id TEXT,
@@ -152,10 +195,12 @@ def init_db():
                 processed_by TEXT,
                 refund_hash TEXT
             )
-        """)
+        """
+        )
 
         # Create vehicles table
-        cursor.execute("""
+        cursor.execute(
+            """
         CREATE TABLE IF NOT EXISTS vehicles (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
@@ -168,7 +213,8 @@ def init_db():
             created_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users (username)
         )
-    """)
+    """
+        )
 
         conn.commit()
         print("Database Created")
@@ -239,11 +285,7 @@ def unnormalize_data(data: List[Dict]) -> List[Dict]:
         # 3. Merge the reconstructed nested parts into the final dictionary
         for k, v in temp_nested_parts.items():
             # If the key already exists (from a base column) and is a dictionary, merge; otherwise overwrite.
-            if (
-                k in final_unflat_dict
-                and isinstance(final_unflat_dict[k], dict)
-                and isinstance(v, dict)
-            ):
+            if k in final_unflat_dict and isinstance(final_unflat_dict[k], dict) and isinstance(v, dict):
                 final_unflat_dict[k].update(v)
             else:
                 final_unflat_dict[k] = v
@@ -264,7 +306,7 @@ def get_table_columns(table_name: str) -> List[str]:
     Retrieves the column names from a specified SQLite table using a temporary connection.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(f"PRAGMA table_info({table_name!r})")
             columns = [info[1] for info in cursor.fetchall()]
@@ -283,7 +325,7 @@ def load_json_from_db(table_name: str) -> List[Dict]:
     """
     normalized_data = []
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(f"SELECT * FROM {table_name!r}")
@@ -296,15 +338,13 @@ def load_json_from_db(table_name: str) -> List[Dict]:
     return unnormalize_data(normalized_data)
 
 
-def load_single_json_from_db(
-    table_name: str, key_col: str, key_val: str
-) -> Optional[Dict]:
+def load_single_json_from_db(table_name: str, key_col: str, key_val: str) -> Optional[Dict]:
     """
     Loads a single row using a WHERE clause.
     """
     normalized_data = None
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -339,12 +379,10 @@ def insert_single_json_to_db(table_name: str, item: Dict):
     # 3. Construct SQL statement
     column_names_sql = ", ".join([f'"{col}"' for col in insert_columns])
     placeholders_sql = ", ".join(["?"] * len(insert_columns))
-    sql_insert = (
-        f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
-    )
+    sql_insert = f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             conn.execute(sql_insert, values_to_insert)
             conn.commit()
     except sqlite3.OperationalError as e:
@@ -352,9 +390,7 @@ def insert_single_json_to_db(table_name: str, item: Dict):
         raise
 
 
-def update_single_json_in_db(
-    table_name: str, key_col: str, key_val: str, update_item: Dict
-):
+def update_single_json_in_db(table_name: str, key_col: str, key_val: str, update_item: Dict):
     """
     Updates a single existing row in the table based on a key column.
     The update_item must contain the complete, final state of the object.
@@ -376,7 +412,7 @@ def update_single_json_in_db(
     sql_update = f'UPDATE "{table_name}" SET {set_sql} WHERE "{key_col}" = ?'
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql_update, tuple(values_to_update))
 
@@ -403,7 +439,7 @@ def save_json_to_db(table_name, data):
     # If no data, just delete and exit
     if not normalized_data:
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            with get_db_connection() as conn:
                 conn.execute(f"DELETE FROM {table_name}")
                 conn.commit()
             return
@@ -423,13 +459,11 @@ def save_json_to_db(table_name, data):
     column_names_sql = ", ".join([f'"{col}"' for col in insert_columns])
     placeholders_sql = ", ".join(["?"] * len(insert_columns))
 
-    sql_insert = (
-        f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
-    )
+    sql_insert = f"INSERT INTO {table_name} ({column_names_sql}) VALUES ({placeholders_sql})"
     sql_delete = f"DELETE FROM {table_name}"
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(sql_delete)
             cursor.executemany(sql_insert, values_to_insert)
@@ -468,6 +502,7 @@ def get_user_data_by_username(username: str) -> Optional[Dict]:
         return None
     return load_single_json_from_db("users", key_col="username", key_val=username)
 
+
 def update_existing_user_in_db(username: str, user_data: Dict):
     if use_mock_data:
         users = load_data(MOCK_USERS)
@@ -477,13 +512,9 @@ def update_existing_user_in_db(username: str, user_data: Dict):
                 save_data(MOCK_USERS, users)
                 return
         raise ValueError("User not found")
-    
-    update_single_json_in_db(
-        "users", 
-        key_col="username", 
-        key_val=username, 
-        update_item=user_data
-    )
+
+    update_single_json_in_db("users", key_col="username", key_val=username, update_item=user_data)
+
 
 # --- Parking Lots ---
 def load_parking_lot_data_from_db():
@@ -532,9 +563,7 @@ def get_payment_data_by_id(payment_id: str) -> Optional[Dict]:
             if payment.get("transaction") == payment_id:
                 return payment
         return None
-    return load_single_json_from_db(
-        "payments", key_col="transaction", key_val=payment_id
-    )
+    return load_single_json_from_db("payments", key_col="transaction", key_val=payment_id)
 
 
 def get_payments_by_initiator(initiator: str) -> List[Dict]:
@@ -547,7 +576,7 @@ def get_payments_by_initiator(initiator: str) -> List[Dict]:
 
     normalized_data = []
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM payments WHERE "initiator" = ?', (initiator,))
@@ -574,7 +603,7 @@ def get_refunds_for_user(username: str) -> List[Dict]:
 
     normalized_data = []
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             # Select all columns from refunds table
@@ -612,9 +641,7 @@ def update_existing_payment_in_db(payment_id: str, payment_data: Dict):
                 save_data(MOCK_PAYMENTS, payments)
                 return
         raise ValueError("Payment not found")
-    update_single_json_in_db(
-        "payments", key_col="transaction", key_val=payment_id, update_item=payment_data
-    )
+    update_single_json_in_db("payments", key_col="transaction", key_val=payment_id, update_item=payment_data)
 
 
 # DEPRECATED/REMOVED: save_payment_data_to_db (Use save_new_payment_to_db or update_existing_payment_in_db)
@@ -657,9 +684,7 @@ def update_existing_discount_in_db(discount_code: str, discount_data: Dict):
                 save_data(MOCK_DISCOUNTS, discounts)
                 return
         raise ValueError("Discount not found")
-    update_single_json_in_db(
-        "discounts", key_col="code", key_val=discount_code, update_item=discount_data
-    )
+    update_single_json_in_db("discounts", key_col="code", key_val=discount_code, update_item=discount_data)
 
 
 def save_discounts_data_to_db(data):
@@ -706,9 +731,7 @@ def update_existing_refund_in_db(refund_id: str, refund_data: Dict):
                 save_data(MOCK_REFUNDS, refunds)
                 return
         raise ValueError("Refund not found")
-    update_single_json_in_db(
-        "refunds", key_col="refund_id", key_val=refund_id, update_item=refund_data
-    )
+    update_single_json_in_db("refunds", key_col="refund_id", key_val=refund_id, update_item=refund_data)
 
 
 def get_refunds_by_transaction_id(transaction_id: str) -> List[Dict]:
@@ -721,7 +744,7 @@ def get_refunds_by_transaction_id(transaction_id: str) -> List[Dict]:
                 filtered_refunds.append(refund)
         return filtered_refunds
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -848,7 +871,7 @@ def save_parking_lot_data(data):
 #     for k, v in parking_lots.items():
 #         if v.get("licenseplate") == licenseplate:
 #             return k
-    #verander dit naar db , wordt gebruikt in parkingservice bij stop parking session
+# verander dit naar db , wordt gebruikt in parkingservice bij stop parking session
 
 
 def load_reservation_data():
@@ -903,6 +926,7 @@ def save_refunds_data(data):
         return
     save_json_to_db("refunds", data)
 
+
 # def save_parking_session_data(data, lid):
 #     if use_mock_data:
 #         save_data(MOCK_PARKING_SESSIONS, data)
@@ -941,8 +965,7 @@ def get_vehicle_data_by_id(vehicle_id: str):
         # allow lookup by 'id' or 'license_plate' key
         if (
             vehicle.get("id") == vehicle_id
-            or vehicle.get("license_plate", "").replace("-", "").upper()
-            == vehicle_id.upper()
+            or vehicle.get("license_plate", "").replace("-", "").upper() == vehicle_id.upper()
         ):
             return vehicle
     return None
@@ -1002,7 +1025,7 @@ def delete_vehicle_from_db(vehicle_id: str):
         return True
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM vehicles WHERE id == ?", (vehicle_id,))
             conn.commit()
@@ -1042,6 +1065,7 @@ def load_parking_sessions_data_from_db():
         return load_data(MOCK_PARKING_SESSIONS)
     return load_json_from_db("parking_sessions")
 
+
 # Get all parking sessions for a specific parking lot ID
 def get_sessions_data_by_id(parking_lot_id: str) -> Dict[str, Dict]:
     try:
@@ -1049,13 +1073,9 @@ def get_sessions_data_by_id(parking_lot_id: str) -> Dict[str, Dict]:
     except Exception:
         return {}
 
-    filtered_sessions = [
-        s for s in sessions
-        if s.get("parking_lot_id") == str(parking_lot_id)
-    ]
+    filtered_sessions = [s for s in sessions if s.get("parking_lot_id") == str(parking_lot_id)]
 
     return {s.get("id"): s for s in filtered_sessions}
-
 
 
 def get_user_by_id(user_id) -> Optional[Dict]:
@@ -1141,6 +1161,7 @@ def delete_parking_session_from_db(session_id: str):
         return False
 
 
+
 # find a parking session ID by parking lot and license plate
 def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str = "TEST-PLATE") -> Optional[str]:
     if use_mock_data:
@@ -1152,13 +1173,10 @@ def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str = "T
             ):
                 return session.get("id")
         return None
-    
+
     all_sessions = load_json_from_db("parking_sessions")
     for session in all_sessions:
-        if (
-            session.get("parking_lot_id") == parking_lot_id
-            and session.get("licenseplate") == licenseplate
-        ):
+        if session.get("parking_lot_id") == parking_lot_id and session.get("licenseplate") == licenseplate:
             return session.get("id")
-    
+
     return None
