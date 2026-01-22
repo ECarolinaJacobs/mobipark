@@ -8,6 +8,13 @@ router = APIRouter()
 # for user billing info
 @router.get("/billing")
 def get_user_billing(Authorization: str = Header(None)):
+    """
+    Retrieve billing information for the authenticated user.
+    
+    Authorization**: Session token (required in header)
+    
+    Return the user's billing records and session information.
+    """
     session_user = get_session(Authorization)
     if not session_user:
         raise HTTPException(
@@ -28,6 +35,13 @@ def get_user_billing(Authorization: str = Header(None)):
 # for admin to get other users billing info
 @router.get("/billing/{username}")
 def get_user_billing_admin(username: str, Authorization: str = Header(None)):
+    """
+    Retrieve billing information for any user (Admin only).
+    username: Username of the user whose billing info to retrieve
+    Authorization: Admin session token (required in header)
+    Return the specified user's billing records and session information.
+    Requires: Admin role
+    """
     token = Authorization
     session_user = get_session(token)
     if not session_user:
