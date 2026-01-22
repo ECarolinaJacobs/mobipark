@@ -1,0 +1,116 @@
+@baseUrl = http://localhost:8000
+@contentType = application/json
+@username = demo_user_001
+@password = password123
+
+### 1. Register User
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+    "username": "{{username}}",
+    "password": "{{password}}",
+    "name": "Demo User",
+    "birth_year": 1990,
+    "role": "USER"
+}
+
+### 2. Login User
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+    "username": "{{username}}",
+    "password": "{{password}}"
+}
+
+### Set Authorization Token Variable
+@authToken = {{login.response.headers.Authorization}}
+
+### 3. Get User Profile
+GET {{baseUrl}}/profile
+Authorization: {{authToken}}
+
+### 4. Create Vehicle
+# @name createVehicle
+POST {{baseUrl}}/vehicles
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+    "user_id": "{{username}}",
+    "license_plate": "XX-99-99",
+    "make": "Tesla",
+    "model": "Model 3",
+    "color": "Red",
+    "year": 2024
+}
+
+### 5. Get All Parking Lots
+# @name getParkingLots
+GET {{baseUrl}}/parking-lots/
+Authorization: {{authToken}}
+
+### Set Parking Lot ID Variable (Assuming ID "1" exists)
+@parkingLotId = 1
+
+### 6. Start Parking Session
+# @name startSession
+POST {{baseUrl}}/parking-lots/{{parkingLotId}}/sessions/start
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+    "licenseplate": "XX-99-99"
+}
+
+### 7. Stop Parking Session
+# @name stopSession
+PUT {{baseUrl}}/parking-lots/{{parkingLotId}}/sessions/stop
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+    "licenseplate": "XX-99-99"
+}
+
+### Set Session ID from Response (if available, otherwise hardcoded for demo)
+# @sessionId = {{stopSession.response.body.id}}
+
+### 8. Create Reservation
+# @name createReservation
+POST {{baseUrl}}/reservations/
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+    "user_id": "{{username}}",
+    "vehicle_id": "{{createVehicle.response.body.id}}",
+    "parking_lot_id": "{{parkingLotId}}",
+    "start_time": "2026-01-20T10:00",
+    "end_time": "2026-01-20T12:00"
+}
+
+### 9. Get User Billing
+GET {{baseUrl}}/billing
+Authorization: {{authToken}}
+
+### 10. Create Payment
+POST {{baseUrl}}/payments
+Authorization: {{authToken}}
+Content-Type: {{contentType}}
+
+{
+    "amount": 10.00,
+    "session_id": 12345,
+    "parking_lot_id": {{parkingLotId}},
+    "t_data": {
+        "amount": 10.00,
+        "date": "2026-01-20",
+        "method": "creditcard",
+        "issuer": "VISA",
+        "bank": "DemoBank"
+    }
+}

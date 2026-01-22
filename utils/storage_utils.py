@@ -77,13 +77,14 @@ def init_db():
                 password TEXT NOT NULL,
                 name TEXT,
                 email TEXT,
-                phone_number TEXT,
+                phone TEXT,
                 role TEXT,
                 created_at TEXT,
                 birth_year INTEGER,
-                is_active INTEGER DEFAULT 1,
+                active INTEGER DEFAULT 1,
                 last_login TEXT,
-                hash_type TEXT
+                hash_type TEXT,
+                managed_parking_lot_id TEXT
             )
         """
         )

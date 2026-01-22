@@ -15,8 +15,11 @@ MOCK_USERS = (Path(__file__).parent.parent / "mock_data/mock_users.json").resolv
 url = "http://localhost:8000/"
 
 
-def create_user(isAdmin, username="test", password="test"):
-    requests.post(f"{url}/register", json={"username": username, "password": password, "name": "tester"})
+def create_user(isAdmin, username="test", password="test", client=None):
+    if client:
+        client.post("/register", json={"username": username, "password": password, "name": "tester"})
+    else:
+        requests.post(f"{url}/register", json={"username": username, "password": password, "name": "tester"})
 
     if isAdmin:
         update_user_role(username, "ADMIN")
@@ -49,17 +52,21 @@ def update_user_role(username, role):
 
 
 def delete_user(username="test"):
-    filename = "../data/users.json"
     if use_mock_data:
         filename = MOCK_USERS
-    with open(filename, "r") as f:
-        users = json.load(f)
-    if not isinstance(users, list):
-        print(f"Warning: users file is not a list, its a {type(users)}. Converting...")
-        users = [users] if users else []
+        with open(filename, "r") as f:
+            users = json.load(f)
+        if not isinstance(users, list):
+            print(f"Warning: users file is not a list, its a {type(users)}. Converting...")
+            users = [users] if users else []
+        new_users = [u for u in users if u.get("username") != username]
+        with open(filename, "w") as f:
+            json.dump(new_users, f, indent=2)
+        return
+
+    users = storage_utils.load_user_data()
     new_users = [u for u in users if u.get("username") != username]
-    with open(filename, "w") as f:
-        json.dump(new_users, f, indent=2)
+    storage_utils.save_user_data(new_users)
 
 
 def delete_parking_lot(name="TEST_PARKING_LOT"):
@@ -129,8 +136,11 @@ def find_parking_session_id_by_plate(parking_lot_id: str, licenseplate: str):
             return k
 
 
-def get_session(username="test", password="test"):
-    res = requests.post(f"{url}/login", json={"username": username, "password": password})
+def get_session(username="test", password="test", client=None):
+    if client:
+        res = client.post("/login", json={"username": username, "password": password})
+    else:
+        res = requests.post(f"{url}/login", json={"username": username, "password": password})
     ses_token = res.json()["session_token"]
     return {"Authorization": ses_token}
 

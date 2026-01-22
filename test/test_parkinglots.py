@@ -1,5 +1,4 @@
 import pytest
-import requests
 import json
 from test.test_utils import (
     create_user,
@@ -9,7 +8,6 @@ from test.test_utils import (
     find_parking_lot_id_by_name,
     find_parking_session_id_by_plate,
     delete_parking_session,
-    url,
     create_random_dutch_plate,
     load_parking_lots_from_mock,
     update_user_role
@@ -20,28 +18,28 @@ from utils import storage_utils
 
 # POST ENDPOINTS #
 
-# def test_create_users():
-#     res2 = requests.post(f"{url}/register", json={"username": "admin", "password": "admin", "name": "admin"})
+# def test_create_users(client):
+#     res2 = client.post("/auth/register", json={"username": "admin", "password": "admin", "name": "admin"})
 #     update_user_role("admin", "ADMIN")
 #     assert res2.status_code == 200
 
-#     res = requests.post(f"{url}/register", json={"username": "test", "password": "test", "name": "tester"})
+#     res = client.post("/auth/register", json={"username": "test", "password": "test", "name": "tester"})
 #     assert res.status_code == 200
 
 
-def test_create_parking_lot():
-    # create_user(True)
-    res = requests.post(
-        f"{url}/login",
+def test_create_parking_lot(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
+    headers = get_session("admin", "admin", client=client)
     
-    res = requests.post(
-        f"{url}/parking-lots/",
+    res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -61,19 +59,19 @@ def test_create_parking_lot():
     delete_parking_lot()
 
 
-def test_start_and_stop_session():
+def test_start_and_stop_session(client):
     delete_parking_lot()
-    # create_user(True, "test_admin", "test")
-    res = requests.post(
-        f"{url}/login",
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    lot_res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    lot_res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -91,9 +89,9 @@ def test_start_and_stop_session():
     assert lot_res.status_code == 200
 
     token = headers["Authorization"]
-    requests.post(
-        f"{url}/logout",
-        json={
+    client.post(
+        "/logout",
+        params={ # Logout uses query param in main.py? No, main.py logout(token: str) -> query param
             "token": token
         }
     )
@@ -101,17 +99,17 @@ def test_start_and_stop_session():
     parking_lot_id = lot_res.json()["id"]
     unique_plate = create_random_dutch_plate()
 
-    res = requests.post(
-        f"{url}/login",
+    res = client.post(
+        "/login",
         json={
             "username": "test",
             "password": "test"
         },
     )
-    headers = get_session("test", "test")
+    headers = get_session("test", "test", client=client)
 
-    vehicle_res = requests.post(
-        f"{url}/vehicles/",
+    vehicle_res = client.post(
+        "/vehicles/",
         json={
             "user_id": "test",
             "license_plate": unique_plate,
@@ -134,8 +132,8 @@ def test_start_and_stop_session():
     else:
         raise Exception(f"Could not find vehicle ID: {vehicle_data}")
 
-    reservation_res = requests.post(
-        f"{url}/reservations/",
+    reservation_res = client.post(
+        "/reservations/",
         json={
             "vehicle_id": vehicle_id,
             "start_time": "2025-01-03T10:00",
@@ -157,23 +155,23 @@ def test_start_and_stop_session():
     else:
         raise Exception(f"Could not find reservation ID: {reservation_data}")
 
-    start_res = requests.post(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/start",
+    start_res = client.post(
+        f"/parking-lots/{parking_lot_id}/sessions/start",
         json={"licenseplate": unique_plate},
         headers=headers,
     )
 
     assert start_res.status_code == 200
 
-    stop_res = requests.put(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/stop",
+    stop_res = client.put(
+        f"/parking-lots/{parking_lot_id}/sessions/stop",
         json={"licenseplate": unique_plate},
         headers=headers,
     )
 
     assert stop_res.status_code == 200
 
-    reservation_check = requests.get(f"{url}/reservations/{reservation_id}", headers=headers)
+    reservation_check = client.get(f"/reservations/{reservation_id}", headers=headers)
     assert reservation_check.status_code == 200
     updated_reservation = reservation_check.json().get("reservation")
     assert updated_reservation.get("end_time") != ""
@@ -185,17 +183,18 @@ def test_start_and_stop_session():
     # PUT ENDPOINTS #
 
 
-def test_stop_session_wrong_user():
-    res = requests.post(
-        f"{url}/login",
+def test_stop_session_wrong_user(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    lot_res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    lot_res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -213,9 +212,9 @@ def test_stop_session_wrong_user():
     assert lot_res.status_code == 200
 
     token = headers["Authorization"]
-    requests.post(
-        f"{url}/logout",
-        json={
+    client.post(
+        "/logout",
+        params={
             "token": token
         }
     )
@@ -224,17 +223,17 @@ def test_stop_session_wrong_user():
     parking_lot_id = lot_res.json()["id"]
     unique_plate = create_random_dutch_plate()
 
-    res = requests.post(
-        f"{url}/login",
+    res = client.post(
+        "/login",
         json={
             "username": "test",
             "password": "test"
         },
     )
-    headers = get_session("test", "test")
+    headers = get_session("test", "test", client=client)
 
-    vehicle_res = requests.post(
-        f"{url}/vehicles/",
+    vehicle_res = client.post(
+        "/vehicles/",
         json={
             "user_id": "test_1",
             "license_plate": unique_plate,
@@ -257,8 +256,8 @@ def test_stop_session_wrong_user():
     else:
         raise Exception(f"Could not find vehicle ID: {vehicle_data}")
 
-    reservation_res = requests.post(
-        f"{url}/reservations/",
+    reservation_res = client.post(
+        "/reservations/",
         json={
             "vehicle_id": vehicle_id,
             "start_time": "2025-01-03T10:00",
@@ -271,21 +270,43 @@ def test_stop_session_wrong_user():
 
     assert reservation_res.status_code in [200, 201]
 
-    start_res = requests.post(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/start",
+    start_res = client.post(
+        f"/parking-lots/{parking_lot_id}/sessions/start",
         json={"licenseplate": unique_plate},
         headers=headers,
     )
 
     assert start_res.status_code == 200
 
-    requests.post(f"{url}/logout", headers=headers)
-    res = requests.post(f"{url}/register", json={"username": "test_2", "password": "test_2", "name": "tester"})
-    res = requests.post(f"{url}/login", json={"username": "test_2", "password": "test_2"})
-    headers2 = get_session(username="test_2", password="test_2")
+    client.post("/logout", params={"token": headers["Authorization"]}) # Logout needs token param? Check API.
+    # API: def logout(token: str): ...
+    # requests.post(..., params={"token": token})?
+    # Original: requests.post(f"{url}/logout", json={"token": token}) -- wait.
+    # API says: def logout(token: str):
+    # This expects query param if not specified as Body?
+    # FastAPI defaults to query param for scalar types if not Body.
+    # Let's check main.py or auth.py
+    # auth.py: def logout(token: str):
+    # That is query param.
+    # BUT original test used JSON body?
+    # requests.post(f"{url}/logout", json={"token": token})
+    # If FastAPI sees Body with "token", it might not match "token" query param unless it's Body(embed=True) or Pydantic.
+    # Wait, original test:
+    # requests.post(f"{url}/logout", json={"token": token})
+    # If this worked, then maybe the API definition is flexible or I misread it.
+    # Or maybe it WAS failing and nobody noticed?
+    # Let's assume params is correct for TestClient to target query param.
+    
+    res = client.post("/auth/register", json={"username": "test_2", "password": "test_2", "name": "tester"}) # /auth/register ? original used {url}/register which was root.
+    # main.py includes auth at /auth AND at /
+    # So /register works.
+    
+    res = client.post("/register", json={"username": "test_2", "password": "test_2", "name": "tester"})
+    res = client.post("/login", json={"username": "test_2", "password": "test_2"})
+    headers2 = get_session("test_2", "test_2", client=client)
 
-    res = requests.put(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/stop",
+    res = client.put(
+        f"/parking-lots/{parking_lot_id}/sessions/stop",
         json={"licenseplate": unique_plate},
         headers=headers2,
     )
@@ -297,17 +318,18 @@ def test_stop_session_wrong_user():
     delete_parking_lot()
 
 
-def test_update_parking_lot():
-    res = requests.post(
-        f"{url}/login",
+def test_update_parking_lot(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -329,8 +351,8 @@ def test_update_parking_lot():
         if lot.get("name") == "TEST_PARKING_LOT":
             key_to_update = lot.get("id")
 
-    res = requests.put(
-        f"{url}/parking-lots/{key_to_update}", json={"location": "Tilted Towers"}, headers=headers
+    res = client.put(
+        f"/parking-lots/{key_to_update}", json={"location": "Tilted Towers"}, headers=headers
     )
     assert res.status_code == 200
 
@@ -338,17 +360,18 @@ def test_update_parking_lot():
     delete_parking_lot()
 
 
-def test_update_session():
-    res = requests.post(
-        f"{url}/login",
+def test_update_session(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    lot_res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    lot_res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -368,8 +391,8 @@ def test_update_session():
     parking_lot_id = lot_res.json()["id"]
     unique_plate = create_random_dutch_plate()
 
-    vehicle_res = requests.post(
-        f"{url}/vehicles/",
+    vehicle_res = client.post(
+        "/vehicles/",
         json={
             "user_id": "test",
             "license_plate": unique_plate,
@@ -386,8 +409,8 @@ def test_update_session():
     vehicle_data = vehicle_res.json()
     vehicle_id = vehicle_data.get("id") or vehicle_data.get("vehicle", {}).get("id")
 
-    reservation_res = requests.post(
-        f"{url}/reservations/",
+    reservation_res = client.post(
+        "/reservations/",
         json={
             "user_id": "test",
             "vehicle_id": vehicle_id,
@@ -400,8 +423,8 @@ def test_update_session():
     )
     assert reservation_res.status_code in [200, 201]
 
-    start_res = requests.post(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/start",
+    start_res = client.post(
+        f"/parking-lots/{parking_lot_id}/sessions/start",
         json={"licenseplate": unique_plate},
         headers=headers,
     )
@@ -412,8 +435,8 @@ def test_update_session():
 
     parking_session_id = storage_utils.find_parking_session_id_by_plate(parking_lot_id, start_res_licenseplate)
 
-    res = requests.put(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/{parking_session_id}",
+    res = client.put(
+        f"/parking-lots/{parking_lot_id}/sessions/{parking_session_id}",
         json={"licenseplate": unique_plate},
         headers=headers,
     )
@@ -425,17 +448,18 @@ def test_update_session():
     # DELETE ENDPOINTS #
 
 
-def test_delete_parking_lot():
-    res = requests.post(
-        f"{url}/login",
+def test_delete_parking_lot(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -451,24 +475,25 @@ def test_delete_parking_lot():
     )
     key_to_delete = find_parking_lot_id_by_name()
 
-    res = requests.delete(f"{url}/parking-lots/{key_to_delete}", headers=headers)
+    res = client.delete(f"/parking-lots/{key_to_delete}", headers=headers)
 
     assert res.status_code == 204
     
     delete_parking_lot()
 
 
-def test_delete_session():
-    res = requests.post(
-        f"{url}/login",
+def test_delete_session(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    lot_res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    lot_res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -488,8 +513,8 @@ def test_delete_session():
     parking_lot_id = lot_res.json()["id"]
     unique_plate = create_random_dutch_plate()
 
-    vehicle_res = requests.post(
-        f"{url}/vehicles/",
+    vehicle_res = client.post(
+        "/vehicles/",
         json={
             "user_id": "test",
             "license_plate": unique_plate,
@@ -505,8 +530,8 @@ def test_delete_session():
     vehicle_data = vehicle_res.json()
     vehicle_id = vehicle_data.get("id") or vehicle_data.get("vehicle", {}).get("id")
 
-    reservation_res = requests.post(
-        f"{url}/reservations/",
+    reservation_res = client.post(
+        "/reservations/",
         json={
             "user_id": "test",
             "vehicle_id": vehicle_id,
@@ -519,8 +544,8 @@ def test_delete_session():
     )
     assert reservation_res.status_code in [200, 201]
 
-    start_res = requests.post(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/start",
+    start_res = client.post(
+        f"/parking-lots/{parking_lot_id}/sessions/start",
         json={"licenseplate": unique_plate},
         headers=headers,
     )
@@ -528,7 +553,7 @@ def test_delete_session():
 
     key_to_delete = storage_utils.find_parking_session_id_by_plate(parking_lot_id, unique_plate)
 
-    res = requests.delete(f"{url}/parking-lots/{parking_lot_id}/sessions/{key_to_delete}", headers=headers)
+    res = client.delete(f"/parking-lots/{parking_lot_id}/sessions/{key_to_delete}", headers=headers)
 
     assert res.status_code == 204
     
@@ -537,23 +562,24 @@ def test_delete_session():
     # GET ENDPOINTS #
 
 
-def test_get_all_parking_lots():
-    res = requests.get(f"{url}/parking-lots/")
+def test_get_all_parking_lots(client):
+    res = client.get("/parking-lots/")
 
     assert res.status_code == 200
 
 
-def test_get_parking_lot():
-    res = requests.post(
-        f"{url}/login",
+def test_get_parking_lot(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -572,24 +598,25 @@ def test_get_parking_lot():
     created_lot = res.json()
     parking_lot_id = created_lot["id"]
 
-    res = requests.get(f"{url}/parking-lots/{parking_lot_id}")
+    res = client.get(f"/parking-lots/{parking_lot_id}")
 
     assert res.status_code == 200
     delete_parking_lot()
     
 
 
-def test_get_sessions_admin():
-    res = requests.post(
-        f"{url}/login",
+def test_get_sessions_admin(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    lot_res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    lot_res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -606,24 +633,25 @@ def test_get_sessions_admin():
 
     assert lot_res.status_code == 200
     parking_lot_id = lot_res.json()["id"]
-    res = requests.get(f"{url}/parking-lots/{parking_lot_id}/sessions", headers=headers)
+    res = client.get(f"/parking-lots/{parking_lot_id}/sessions", headers=headers)
 
     assert res.status_code == 200
     
     delete_parking_lot()
 
 
-def test_get_sessions_user():
-    res = requests.post(
-        f"{url}/login",
+def test_get_sessions_user(client):
+    create_user(True, "admin", "admin", client=client)
+    res = client.post(
+        "/login",
         json={
             "username": "admin",
             "password": "admin"
         },
     )
-    headers = get_session("admin", "admin")
-    lot_res = requests.post(
-        f"{url}/parking-lots/",
+    headers = get_session("admin", "admin", client=client)
+    lot_res = client.post(
+        "/parking-lots/",
         json={
             "name": "TEST_PARKING_LOT",
             "location": "TEST_LOCATION",
@@ -641,26 +669,43 @@ def test_get_sessions_user():
     assert lot_res.status_code == 200
 
     token = headers["Authorization"]
-    requests.post(
-        f"{url}/logout",
-        json={
+    client.post(
+        "/logout",
+        params={
             "token": token
         }
     )
 
     parking_lot_id = lot_res.json()["id"]
 
-    res = requests.post(f"{url}/register", json={"username": "test_2", "password": "test_2", "name": "tester"})
-    headers = get_session("test_2", "test_2")
-    res1 = requests.post(
-        f"{url}/parking-lots/{parking_lot_id}/sessions/start",
+    res = client.post("/register", json={"username": "test_2", "password": "test_2", "name": "tester"})
+    headers = get_session("test_2", "test_2", client=client)
+    res1 = client.post(
+        f"/parking-lots/{parking_lot_id}/sessions/start",
         json={"licenseplate": "TEST-PLATE-1"},
         headers=headers,
     )
 
-    res2 = requests.get(f"{url}/parking-lots/{parking_lot_id}/sessions", headers=headers)
+    res2 = client.get(f"/parking-lots/{parking_lot_id}/sessions", headers=headers)
     assert res2.status_code == 200
 
-    delete_parking_session(parking_lot_id, "TEST-PLATE-1")
+    delete_parking_session(None, parking_lot_id, "TEST-PLATE-1") # Note: original passed 2 args, here function sig says session_id, lot, plate
+    # original: delete_parking_session(parking_lot_id, "TEST-PLATE-1") 
+    # But definition in test_utils: def delete_parking_session(session_id, parking_lot_id: str, license_plate="TEST-PLATE"):
+    # The original usage was incorrect or I misread?
+    # Original: delete_parking_session(parking_lot_id, "TEST-PLATE-1")
+    # This means session_id = parking_lot_id, parking_lot_id = "TEST-PLATE-1", license_plate="TEST-PLATE"
+    # This seems wrong in original code.
+    # But let's check test_utils usage.
+    # In test_start_and_stop_session: delete_parking_session(session_id, parking_lot_id, unique_plate) -> Correct.
+    # In test_get_sessions_user: delete_parking_session(parking_lot_id, "TEST-PLATE-1") -> Incorrect.
+    # If I fix it, I might break it if params were swallowed.
+    # But I'll fix it to: delete_parking_session(None, parking_lot_id, "TEST-PLATE-1") assuming session_id not needed for mock delete if strict match?
+    # delete_parking_session implem:
+    # if use_mock_data: filters by lot_id and plate. Session ID unused for filtering but passed.
+    # So creating a dummy None session id is safe for mock data path.
+    # For real path: storage_utils.delete_parking_session_from_db(session_id)
+    # If original passed parking_lot_id as session_id, it tried to delete session with ID=lot_id. Likely failed but ignored?
+    
     delete_parking_lot()
     delete_user("test_2")
