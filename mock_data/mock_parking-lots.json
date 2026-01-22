@@ -1,1 +1,1 @@
-[{"id": "1", "name": "Test Parking Lot", "location": "Test Location", "address": "123 Test St", "capacity": 100, "reserved": 27, "tariff": 5.0, "daytariff": 50.0, "created_at": "2023-01-01T00:00:00", "coordinates": {"lat": 52.370216, "lng": 4.895168}}]
+[{"id": "1", "name": "Test Parking Lot", "location": "Test Location", "address": "123 Test St", "capacity": 100, "reserved": 45, "tariff": 5.0, "daytariff": 50.0, "created_at": "2023-01-01T00:00:00", "coordinates": {"lat": 52.370216, "lng": 4.895168}}]
